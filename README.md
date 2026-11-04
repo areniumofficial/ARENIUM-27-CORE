@@ -133,3 +133,4 @@ The system includes an optical camera scanner powered by `html5-qrcode`. For dev
 "# ARENIUM-27-CORE" 
 "# ARENIUM-27-CORE" 
 "# ARENIUM-27-CORE" 
+"# ARENIUM-27-CORE" 
