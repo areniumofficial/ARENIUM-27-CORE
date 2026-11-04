@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Users, QrCode, UserCheck, Clock, CheckCircle2, XCircle, Clock3, Plus, Send, AlertCircle, Sparkles, ShieldCheck } from 'lucide-react';
+import { Users, QrCode, UserCheck, Clock, CheckCircle2, XCircle, Clock3, Plus, Send, AlertCircle, Sparkles, ShieldCheck, Printer, Download } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 
 export default function ParticipantPortal({ currentUser }) {
@@ -25,7 +25,16 @@ export default function ParticipantPortal({ currentUser }) {
   const [newMemSchool, setNewMemSchool] = useState('School of Engineering');
   const [newMemHod, setNewMemHod] = useState('Dr. Ramesh Kumar');
 
-  const HOURS_LIST = [1, 2, 3, 4, 5, 6, 7, 8];
+  const TIMETABLE_HOURS = [
+    { hr: 1, label: 'Hour 1', time: '09:00 - 10:00' },
+    { hr: 2, label: 'Hour 2', time: '10:00 - 11:00' },
+    { hr: 3, label: 'Hour 3', time: '11:00 - 12:00' },
+    { hr: 4, label: 'Hour 4', time: '12:00 - 13:00' },
+    { hr: 5, label: 'Hour 5', time: '13:45 - 14:45' },
+    { hr: 6, label: 'Hour 6', time: '14:45 - 15:45' },
+    { hr: 7, label: 'Hour 7', time: '15:45 - 16:45' },
+    { hr: 8, label: 'Hour 8', time: '16:45 - 17:30' }
+  ];
 
   useEffect(() => {
     fetchTeamData();
@@ -53,12 +62,11 @@ export default function ParticipantPortal({ currentUser }) {
     }
   };
 
-  const selectAllHours = () => {
-    if (selectedHours.length === 8) {
-      setSelectedHours([]);
-    } else {
-      setSelectedHours([1, 2, 3, 4, 5, 6, 7, 8]);
-    }
+  const setHourPreset = (preset) => {
+    if (preset === 'ALL') setSelectedHours([1, 2, 3, 4, 5, 6, 7, 8]);
+    else if (preset === 'MORNING') setSelectedHours([1, 2, 3, 4]);
+    else if (preset === 'AFTERNOON') setSelectedHours([5, 6, 7, 8]);
+    else if (preset === 'CLEAR') setSelectedHours([]);
   };
 
   // Submit OD Request
@@ -171,62 +179,62 @@ export default function ParticipantPortal({ currentUser }) {
   }) : '';
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-7">
       
-      {/* Team Header Ribbon */}
-      <div className="rounded-3xl p-6 sm:p-8 bg-gradient-to-r from-[#92EEFF] via-[#30AFFF] to-[#C4F7CA] text-slate-900 border border-white/60 shadow-lg shadow-[#30AFFF]/15">
+      {/* Light Team Header Ribbon */}
+      <div className="rounded-3xl p-6 sm:p-8 bg-white border border-slate-200/80 shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-md">
-              <Users className="w-8 h-8 text-[#92EEFF]" />
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#92EEFF]/30 to-[#30AFFF]/20 border border-[#30AFFF]/30 flex items-center justify-center shadow-xs">
+              <Users className="w-7 h-7 text-[#006dae]" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-slate-900 text-white">
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-[#92EEFF]/30 text-sky-950 border border-[#92EEFF]/60">
                   PARTICIPANT TEAM
                 </span>
                 {team.verified ? (
-                  <span className="flex items-center gap-1 text-[11px] font-bold bg-[#D8FFC5] text-emerald-950 px-2.5 py-0.5 rounded-full border border-emerald-300">
+                  <span className="flex items-center gap-1 text-[11px] font-bold bg-[#D8FFC5]/80 text-emerald-950 px-2.5 py-0.5 rounded-full border border-[#C4F7CA]">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
                     VERIFIED TEAM
                   </span>
                 ) : (
-                  <span className="text-[11px] font-bold bg-amber-100 text-amber-900 px-2.5 py-0.5 rounded-full border border-amber-300">
+                  <span className="text-[11px] font-bold bg-amber-50 text-amber-900 px-2.5 py-0.5 rounded-full border border-amber-200">
                     Pending Gate Verification
                   </span>
                 )}
               </div>
-              <h1 className="text-2xl sm:text-3xl font-black text-slate-950 mt-1">
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
                 {team.teamName}
               </h1>
-              <p className="text-xs font-semibold text-slate-800">
+              <p className="text-xs font-medium text-slate-600">
                 {team.category || 'General Events'} • {team.members?.length || 0} Registered Members
               </p>
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2.5">
             <button
               onClick={() => { setActiveTab('QR_PASSES'); setFeedback(null); }}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all ${
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all border ${
                 activeTab === 'QR_PASSES'
-                  ? 'bg-slate-900 text-white shadow-md'
-                  : 'bg-white/80 hover:bg-white text-slate-800'
+                  ? 'bg-gradient-to-r from-[#30AFFF] to-[#2598e0] text-white border-[#30AFFF] shadow-xs'
+                  : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
               }`}
             >
-              <QrCode className="w-4 h-4 text-[#92EEFF]" />
+              <QrCode className="w-4 h-4" />
               <span>Team & Self QR Passes</span>
             </button>
 
             <button
               onClick={() => { setActiveTab('APPLY_OD'); setFeedback(null); }}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all ${
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all border ${
                 activeTab === 'APPLY_OD'
-                  ? 'bg-slate-900 text-white shadow-md'
-                  : 'bg-white/80 hover:bg-white text-slate-800'
+                  ? 'bg-gradient-to-r from-[#30AFFF] to-[#2598e0] text-white border-[#30AFFF] shadow-xs'
+                  : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
               }`}
             >
-              <Clock className="w-4 h-4 text-[#30AFFF]" />
+              <Clock className="w-4 h-4" />
               <span>Apply Hourly OD</span>
             </button>
           </div>
@@ -238,7 +246,7 @@ export default function ParticipantPortal({ currentUser }) {
         <div
           className={`p-4 rounded-2xl flex items-center gap-3 text-sm font-semibold transition-all ${
             feedback.type === 'success'
-              ? 'bg-[#D8FFC5] border border-[#C4F7CA] text-emerald-950'
+              ? 'bg-[#D8FFC5]/70 border border-[#C4F7CA] text-emerald-950'
               : 'bg-rose-50 border border-rose-200 text-rose-800'
           }`}
         >
@@ -253,66 +261,79 @@ export default function ParticipantPortal({ currentUser }) {
 
       {/* TAB 1: QR PASSES (TEAM VALIDATION QR & SELF ENTRY QR) */}
       {activeTab === 'QR_PASSES' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-7">
           
-          {/* TEAM QR CODE CARD (For Team Validation by Volunteers) */}
-          <div className="lg:col-span-5 bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm flex flex-col items-center text-center space-y-4">
+          {/* TEAM QR CODE CARD */}
+          <div className="lg:col-span-5 bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-xs flex flex-col items-center text-center space-y-4">
             <div className="w-full text-left border-b border-slate-100 pb-3 flex items-center justify-between">
               <div>
-                <span className="text-[10px] font-black uppercase tracking-wider text-[#30AFFF]">Pass 01</span>
-                <h2 className="text-base font-black text-slate-900">TEAM VALIDATION QR</h2>
+                <span className="text-[10px] font-black uppercase tracking-wider text-[#006dae] bg-[#30AFFF]/10 px-2 py-0.5 rounded-md">
+                  Pass 01
+                </span>
+                <h2 className="text-base font-black text-slate-900 mt-1">TEAM VALIDATION QR</h2>
               </div>
               {team.verified ? (
-                <span className="text-[10px] font-bold text-emerald-700 bg-[#C4F7CA] px-2 py-0.5 rounded-md">
-                  Verified
+                <span className="text-[10px] font-bold text-emerald-800 bg-[#D8FFC5]/80 px-2.5 py-0.5 rounded-md border border-[#C4F7CA]">
+                  Verified Team
                 </span>
               ) : (
-                <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md">
+                <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-md border border-amber-200">
                   Show to Volunteer
                 </span>
               )}
             </div>
 
             <p className="text-xs text-slate-500">
-              Present this QR to any Volunteer to verify your full team presence and register arena check-in.
+              Present this pass at the gate for full team check-in and roster verification.
             </p>
 
-            {/* QR SVG Frame */}
-            <div className="p-4 rounded-3xl bg-gradient-to-tr from-[#92EEFF]/30 to-[#D8FFC5]/50 border-2 border-[#30AFFF] shadow-md inline-block">
+            {/* Light Frame */}
+            <div className="p-4 rounded-3xl bg-slate-50 border-2 border-[#30AFFF]/40 shadow-xs inline-block">
               <div className="bg-white p-3 rounded-2xl shadow-inner">
                 <QRCodeSVG
                   value={teamQRPayload}
-                  size={190}
+                  size={180}
                   level="H"
                   includeMargin={true}
                 />
               </div>
             </div>
 
-            <div className="w-full text-xs font-semibold text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <div className="w-full text-xs font-semibold text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-200/80">
               <div>Team: <span className="font-bold text-slate-900">{team.teamName}</span></div>
               <div className="text-[11px] text-slate-500 mt-0.5">
                 {team.verified
                   ? `Verified at ${new Date(team.verifiedAt).toLocaleTimeString()} by ${team.verifiedBy || 'Volunteer'}`
-                  : 'Awaiting first volunteer optical check'}
+                  : 'Awaiting volunteer optical check'}
               </div>
             </div>
           </div>
 
-          {/* SELF ENTRY QR CODE (Individual Gate Pass for Hourly Attendance) */}
-          <div className="lg:col-span-7 bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm space-y-5">
+          {/* SELF ENTRY QR CODE (Individual Gate Pass) */}
+          <div className="lg:col-span-7 bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-xs space-y-5">
             <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
               <div>
-                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600">Pass 02</span>
-                <h2 className="text-base font-black text-slate-900">MEMBER SELF-ENTRY QR BADGE</h2>
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-[#D8FFC5]/70 px-2 py-0.5 rounded-md">
+                  Pass 02
+                </span>
+                <h2 className="text-base font-black text-slate-900 mt-1">MEMBER SELF-ENTRY QR BADGE</h2>
               </div>
-              <button
-                onClick={() => setShowAddMember(!showAddMember)}
-                className="flex items-center gap-1 text-xs font-bold text-[#30AFFF] hover:underline"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Member</span>
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => window.print()}
+                  className="flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Print Pass</span>
+                </button>
+                <button
+                  onClick={() => setShowAddMember(!showAddMember)}
+                  className="flex items-center gap-1 text-xs font-bold text-[#006dae] hover:underline"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Member</span>
+                </button>
+              </div>
             </div>
 
             {/* Add Member Drawer */}
@@ -326,7 +347,7 @@ export default function ParticipantPortal({ currentUser }) {
                     value={newMemName}
                     onChange={(e) => setNewMemName(e.target.value)}
                     required
-                    className="p-2 rounded-lg border border-slate-300"
+                    className="p-2 rounded-lg border border-slate-300 bg-white"
                   />
                   <input
                     type="text"
@@ -334,35 +355,35 @@ export default function ParticipantPortal({ currentUser }) {
                     value={newMemRoll}
                     onChange={(e) => setNewMemRoll(e.target.value)}
                     required
-                    className="p-2 rounded-lg border border-slate-300"
+                    className="p-2 rounded-lg border border-slate-300 bg-white"
                   />
                   <input
                     type="text"
                     placeholder="Section (e.g. CSE-02)"
                     value={newMemSection}
                     onChange={(e) => setNewMemSection(e.target.value)}
-                    className="p-2 rounded-lg border border-slate-300"
+                    className="p-2 rounded-lg border border-slate-300 bg-white"
                   />
                   <input
                     type="text"
                     placeholder="Batch (e.g. Batch 2023-27)"
                     value={newMemBatch}
                     onChange={(e) => setNewMemBatch(e.target.value)}
-                    className="p-2 rounded-lg border border-slate-300"
+                    className="p-2 rounded-lg border border-slate-300 bg-white"
                   />
                   <input
                     type="text"
                     placeholder="School Name"
                     value={newMemSchool}
                     onChange={(e) => setNewMemSchool(e.target.value)}
-                    className="p-2 rounded-lg border border-slate-300"
+                    className="p-2 rounded-lg border border-slate-300 bg-white"
                   />
                   <input
                     type="text"
                     placeholder="HOD Name"
                     value={newMemHod}
                     onChange={(e) => setNewMemHod(e.target.value)}
-                    className="p-2 rounded-lg border border-slate-300"
+                    className="p-2 rounded-lg border border-slate-300 bg-white"
                   />
                 </div>
                 <div className="flex justify-end gap-2">
@@ -386,7 +407,7 @@ export default function ParticipantPortal({ currentUser }) {
             {/* Member Selector Pills */}
             <div>
               <label className="block text-xs font-bold uppercase text-slate-500 mb-2">
-                Select Member to Display Individual QR:
+                Select Member to Display Badge:
               </label>
               <div className="flex flex-wrap gap-2">
                 {team.members.map((mem) => (
@@ -396,7 +417,7 @@ export default function ParticipantPortal({ currentUser }) {
                     onClick={() => setSelectedMember(mem)}
                     className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border ${
                       selectedMember?.id === mem.id
-                        ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                        ? 'bg-[#30AFFF] text-white border-[#30AFFF] shadow-xs'
                         : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300'
                     }`}
                   >
@@ -406,21 +427,21 @@ export default function ParticipantPortal({ currentUser }) {
               </div>
             </div>
 
-            {/* Active Selected Member QR Display */}
+            {/* Active Selected Member QR Display as a Clean Delegate Badge */}
             {selectedMember && (
-              <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-center gap-6">
+              <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-50 to-white border border-slate-200 flex flex-col sm:flex-row items-center gap-6 shadow-2xs">
                 <div className="p-3 bg-white rounded-2xl border-2 border-[#C4F7CA] shadow-sm shrink-0">
                   <QRCodeSVG
                     value={memberQRPayload}
-                    size={150}
+                    size={145}
                     level="H"
                     includeMargin={true}
                   />
                 </div>
 
                 <div className="space-y-1.5 text-xs text-slate-600 flex-1">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-[#C4F7CA] px-2 py-0.5 rounded">
-                    Individual Entry Badge
+                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-[#D8FFC5]/80 px-2 py-0.5 rounded">
+                    Official Delegate Badge
                   </span>
                   <div className="text-base font-black text-slate-900">
                     {selectedMember.name}
@@ -432,7 +453,7 @@ export default function ParticipantPortal({ currentUser }) {
                   <div>School: {selectedMember.schoolName}</div>
                   <div>HOD: {selectedMember.hodName}</div>
                   <p className="text-[11px] text-slate-500 italic pt-1 border-t border-slate-200">
-                    Show this badge to Volunteers to mark hourly attendance (Hours 1-8).
+                    Scan this badge at volunteer checkpoints for hourly attendance (Hours 1–8).
                   </p>
                 </div>
               </div>
@@ -445,24 +466,24 @@ export default function ParticipantPortal({ currentUser }) {
 
       {/* TAB 2: APPLY HOURLY OD & VIEW HISTORY */}
       {activeTab === 'APPLY_OD' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-7">
           
           {/* Apply Form */}
-          <div className="lg:col-span-5 bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm space-y-6">
-            <div className="border-b border-slate-100 pb-4">
+          <div className="lg:col-span-5 bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-xs space-y-5">
+            <div className="border-b border-slate-100 pb-3">
               <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
                 <Clock className="w-5 h-5 text-[#30AFFF]" />
                 Apply Participant OD Leave
               </h2>
-              <p className="text-xs text-slate-500 mt-1">
-                Select your event date and required hours (1-8). Submitted straight to Admin supervisor for approval.
+              <p className="text-xs text-slate-500 mt-0.5">
+                Select member, event date and hours (1–8). Dispatched directly to Admin supervisor.
               </p>
             </div>
 
-            <form onSubmit={handleApplyOD} className="space-y-5">
+            <form onSubmit={handleApplyOD} className="space-y-4">
               {/* Member Selector */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
                   Applicant Member
                 </label>
                 <select
@@ -471,7 +492,7 @@ export default function ParticipantPortal({ currentUser }) {
                     const found = team.members.find(m => m.id === e.target.value);
                     if (found) setSelectedMember(found);
                   }}
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-900 bg-white"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-900 bg-white"
                 >
                   {team.members.map((m) => (
                     <option key={m.id} value={m.id}>
@@ -483,7 +504,7 @@ export default function ParticipantPortal({ currentUser }) {
 
               {/* Date */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
                   OD Date
                 </label>
                 <input
@@ -491,40 +512,59 @@ export default function ParticipantPortal({ currentUser }) {
                   value={odDate}
                   onChange={(e) => setOdDate(e.target.value)}
                   required
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-900 bg-white"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-900 bg-white"
                 />
               </div>
 
-              {/* Hours Selector 1-8 */}
+              {/* Smart Hours Presets */}
               <div>
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">
-                    Select Hours (1 to 8)
+                    Select Hours (1 to 8):
                   </label>
-                  <button
-                    type="button"
-                    onClick={selectAllHours}
-                    className="text-[11px] font-bold text-[#006ca8] hover:underline"
-                  >
-                    {selectedHours.length === 8 ? 'Deselect All' : 'Select All 8 Hours'}
-                  </button>
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setHourPreset('ALL')}
+                      className="text-[10px] font-bold text-[#006dae] hover:bg-[#30AFFF]/10 px-1.5 py-0.5 rounded"
+                    >
+                      All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setHourPreset('MORNING')}
+                      className="text-[10px] font-bold text-[#006dae] hover:bg-[#30AFFF]/10 px-1.5 py-0.5 rounded"
+                    >
+                      H1-4
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setHourPreset('AFTERNOON')}
+                      className="text-[10px] font-bold text-[#006dae] hover:bg-[#30AFFF]/10 px-1.5 py-0.5 rounded"
+                    >
+                      H5-8
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-4 gap-2">
-                  {HOURS_LIST.map((hr) => {
+                  {TIMETABLE_HOURS.map(({ hr, label, time }) => {
                     const isSelected = selectedHours.includes(hr);
                     return (
                       <button
                         key={hr}
                         type="button"
                         onClick={() => toggleHour(hr)}
-                        className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border ${
+                        className={`p-2 rounded-xl text-center transition-all border ${
                           isSelected
-                            ? 'bg-[#30AFFF] text-white border-[#30AFFF] shadow-xs scale-102'
+                            ? 'bg-[#30AFFF] text-white border-[#30AFFF] shadow-xs'
                             : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300'
                         }`}
                       >
-                        Hour {hr}
+                        <div className="text-xs font-extrabold">{label}</div>
+                        <div className={`text-[9px] ${isSelected ? 'text-white/80' : 'text-slate-400'}`}>
+                          {time}
+                        </div>
                       </button>
                     );
                   })}
@@ -533,7 +573,7 @@ export default function ParticipantPortal({ currentUser }) {
 
               {/* Reason */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
                   Event Duty / Competition Reason
                 </label>
                 <textarea
@@ -541,14 +581,14 @@ export default function ParticipantPortal({ currentUser }) {
                   onChange={(e) => setOdReason(e.target.value)}
                   rows={2}
                   required
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#30AFFF]"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-medium text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#30AFFF]"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl text-xs font-black tracking-wide text-slate-950 bg-gradient-to-r from-[#30AFFF] via-[#92EEFF] to-[#D8FFC5] hover:opacity-95 shadow-md shadow-[#30AFFF]/20 cursor-pointer disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-black tracking-wide text-white bg-gradient-to-r from-[#30AFFF] to-[#1e96e6] hover:brightness-105 shadow-sm shadow-[#30AFFF]/25 cursor-pointer disabled:opacity-50"
               >
                 <Send className="w-4 h-4" />
                 <span>SUBMIT OD APPLICATION TO ADMIN</span>
@@ -557,15 +597,15 @@ export default function ParticipantPortal({ currentUser }) {
           </div>
 
           {/* OD History */}
-          <div className="lg:col-span-7 bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+          <div className="lg:col-span-7 bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-xs space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
                 <h2 className="text-lg font-black text-slate-900">Team OD Application Status</h2>
                 <p className="text-xs text-slate-500">Live review status from Admin Supervisor</p>
               </div>
               <button
                 onClick={fetchTeamData}
-                className="text-xs font-bold text-[#30AFFF] hover:underline"
+                className="text-xs font-bold text-[#006dae] hover:underline"
               >
                 Refresh
               </button>
@@ -580,7 +620,7 @@ export default function ParticipantPortal({ currentUser }) {
                 {odHistory.map((item) => (
                   <div
                     key={item.id}
-                    className="p-4 rounded-2xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-slate-300 transition-all space-y-2 shadow-2xs"
+                    className="p-4 rounded-2xl border border-slate-200 bg-white hover:border-[#30AFFF]/40 transition-all space-y-2 shadow-2xs"
                   >
                     <div className="flex items-center justify-between">
                       <div>
@@ -589,23 +629,23 @@ export default function ParticipantPortal({ currentUser }) {
                       </div>
 
                       {item.status === 'APPROVED' ? (
-                        <span className="flex items-center gap-1 text-xs font-bold text-emerald-700 bg-[#C4F7CA] px-2.5 py-0.5 rounded-full border border-emerald-300">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Approved
+                        <span className="flex items-center gap-1 text-xs font-bold text-emerald-800 bg-[#D8FFC5]/70 px-2.5 py-0.5 rounded-full border border-[#C4F7CA]">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" /> Approved
                         </span>
                       ) : item.status === 'REJECTED' ? (
-                        <span className="flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-100 px-2.5 py-0.5 rounded-full border border-rose-300">
-                          <XCircle className="w-3.5 h-3.5" /> Rejected
+                        <span className="flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
+                          <XCircle className="w-3.5 h-3.5 text-rose-600" /> Rejected
                         </span>
                       ) : (
-                        <span className="flex items-center gap-1 text-xs font-bold text-amber-700 bg-amber-100 px-2.5 py-0.5 rounded-full border border-amber-300">
-                          <Clock3 className="w-3.5 h-3.5" /> Pending Admin
+                        <span className="flex items-center gap-1 text-xs font-bold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
+                          <Clock3 className="w-3.5 h-3.5 text-amber-600" /> Pending Admin
                         </span>
                       )}
                     </div>
 
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] text-slate-600 font-bold">Date: {item.date}</span>
-                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-[#30AFFF]/15 text-[#006ca8] border border-[#30AFFF]/30">
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-[#30AFFF]/15 text-[#006dae] border border-[#30AFFF]/30">
                         {item.hoursFormatted}
                       </span>
                     </div>
@@ -615,7 +655,7 @@ export default function ParticipantPortal({ currentUser }) {
                     </p>
 
                     {item.adminRemark && (
-                      <div className="text-[11px] text-slate-600 italic bg-white p-2 rounded-lg border border-slate-100">
+                      <div className="text-[11px] text-slate-600 italic bg-slate-50 p-2 rounded-lg border border-slate-200/80">
                         Admin Note: "{item.adminRemark}"
                       </div>
                     )}

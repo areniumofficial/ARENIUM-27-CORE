@@ -41,13 +41,34 @@ export default function App() {
     localStorage.removeItem('arenium_user');
   };
 
+  // Instant 1-click persona switch from top demo bar
+  const handleQuickSwitch = async (persona) => {
+    try {
+      const payload = {
+        role: persona.role,
+        email: persona.email,
+        password: persona.pass,
+        teamName: persona.teamName
+      };
+      const res = await apiFetch('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      if (res.success && res.user) {
+        handleLoginSuccess(res.user);
+      }
+    } catch (err) {
+      console.error('Quick switch failed:', err);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#FBFBFB] text-slate-800 flex flex-col font-sans selection:bg-[#92EEFF] selection:text-slate-900">
-      {/* Top Brand Navigation */}
+      {/* Top Brand Navigation with Demo Quick Switcher */}
       <Navbar
         currentUser={currentUser}
         onLogout={handleLogout}
-        onSwitchRole={handleLogout}
+        onQuickSwitch={handleQuickSwitch}
         serverOnline={serverOnline}
       />
 
@@ -68,7 +89,7 @@ export default function App() {
             <p className="text-sm font-bold text-slate-600">Unrecognized session role.</p>
             <button
               onClick={handleLogout}
-              className="mt-4 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold"
+              className="mt-4 px-4 py-2 bg-[#30AFFF] text-white rounded-xl text-xs font-bold"
             >
               Sign In Again
             </button>
@@ -76,15 +97,20 @@ export default function App() {
         )}
       </main>
 
-      {/* Modern Compact Footer */}
-      <footer className="border-t border-slate-200/80 bg-white/70 backdrop-blur-xs py-4 px-6 text-center text-xs text-slate-500">
+      {/* Light Clean Footer */}
+      <footer className="border-t border-slate-200/80 bg-white/80 backdrop-blur-xs py-4 px-6 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="font-black text-slate-800">ARENIUM 27</span>
-            <span>• Presidency University</span>
+            <span className="font-black text-slate-900">ARENIUM 27</span>
+            <span>• Presidency University Tech Fest Attendance & OD Engine</span>
           </div>
-          <div className="text-[11px] text-slate-400">
-            Palette: #30AFFF • #92EEFF • #D8FFC5 • #C4F7CA • #FBFBFB
+          <div className="flex items-center gap-2 text-[11px] text-slate-400 font-medium">
+            <span>Color Palette:</span>
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#30AFFF]" title="#30AFFF"></span>
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#92EEFF]" title="#92EEFF"></span>
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#D8FFC5]" title="#D8FFC5"></span>
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#C4F7CA]" title="#C4F7CA"></span>
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#FBFBFB] border border-slate-300" title="#FBFBFB"></span>
           </div>
         </div>
       </footer>
