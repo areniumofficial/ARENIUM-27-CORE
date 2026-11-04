@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
-const { readDB, writeDB, initDB } = require('./db');
+const { readDB, writeDB, initDB, resetToRealData, restoreFromBackup, getStorageMode } = require('./db');
 const { generateODExcel } = require('./excel');
 
 initDB();
@@ -629,7 +629,8 @@ app.get('/api/admin/overview', (req, res) => {
     totalTeams: db.teams.length,
     verifiedTeams: db.teams.filter(t => t.verified).length,
     totalVolunteers: db.volunteers.length,
-    approvedVolunteers: db.volunteers.filter(v => v.status === 'APPROVED').length
+    approvedVolunteers: db.volunteers.filter(v => v.status === 'APPROVED').length,
+    storageMode: getStorageMode()
   });
 });
 
@@ -834,12 +835,51 @@ app.get('/api/admin/export-excel', (req, res) => {
   return res.send(excelBuffer);
 });
 
-// Reset demo data helper
-app.post('/api/system/reset-demo', (req, res) => {
-  const db = initDB();
-  res.json({ success: true, message: 'Database reset to initial demo state' });
+// Download full system backup as JSON
+app.get('/api/admin/export-backup', (req, res) => {
+  const db = readDB();
+  const dateStr = new Date().toISOString().split('T')[0];
+  const filename = `ARENIUM27_FULL_BACKUP_${dateStr}.json`;
+
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(JSON.stringify(db, null, 2));
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[ARENIUM 27 CORE] Server running on port ${PORT} (All network interfaces)`);
+// Restore system from uploaded JSON backup
+app.post('/api/admin/restore-backup', (req, res) => {
+  const { backupData } = req.body;
+  if (!backupData) {
+    return res.status(400).json({ error: 'No backup data provided' });
+  }
+
+  try {
+    const restored = restoreFromBackup(backupData);
+    res.json({
+      success: true,
+      message: 'System successfully restored from backup snapshot',
+      counts: {
+        volunteers: restored.volunteers.length,
+        teams: restored.teams.length,
+        odRequests: restored.odRequests.length
+      }
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message || 'Failed to restore backup' });
+  }
 });
+
+// Reset to clean real state (zero demo data)
+app.post('/api/system/reset-demo', (req, res) => {
+  const db = resetToRealData();
+  res.json({ success: true, message: 'Database reset to clean real state' });
+});
+
+if (require.main === module) {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`[ARENIUM 27 CORE] Server running on port ${PORT} (All network interfaces)`);
+  });
+}
+
+module.exports = app;
+

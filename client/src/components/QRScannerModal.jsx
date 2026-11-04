@@ -1,61 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { X, Camera, RefreshCw, AlertCircle, Sparkles, CheckCircle2 } from 'lucide-react';
+import { X, Camera, RefreshCw, AlertCircle, CheckCircle2, QrCode } from 'lucide-react';
 
 export default function QRScannerModal({ isOpen, onClose, onScanSuccess, title, mode = 'PARTICIPANT' }) {
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState(null);
   const [manualCode, setManualCode] = useState('');
   const html5QrCodeRef = useRef(null);
-
-  // Sample presets for 1-click testing when camera is unavailable
-  const SAMPLE_PRESETS = mode === 'TEAM' ? [
-    { label: 'Team: CyberKnights', data: JSON.stringify({ type: 'ARENIUM_TEAM', teamName: 'CyberKnights' }) },
-    { label: 'Team: QuantumForge', data: JSON.stringify({ type: 'ARENIUM_TEAM', teamName: 'QuantumForge' }) }
-  ] : [
-    {
-      label: 'Tanmay (CSE-08, CyberKnights)',
-      data: JSON.stringify({
-        type: 'ARENIUM_PARTICIPANT',
-        id: 'mem-1',
-        name: 'Tanmay Bhattacharya',
-        rollNumber: '20221CSE0552',
-        section: 'CSE-08',
-        batchNumber: 'Batch 2022-26',
-        schoolName: 'School of Engineering',
-        hodName: 'Dr. Ramesh Kumar',
-        teamName: 'CyberKnights'
-      })
-    },
-    {
-      label: 'Sneha (CSE-08, CyberKnights)',
-      data: JSON.stringify({
-        type: 'ARENIUM_PARTICIPANT',
-        id: 'mem-2',
-        name: 'Sneha Kulkarni',
-        rollNumber: '20221CSE0558',
-        section: 'CSE-08',
-        batchNumber: 'Batch 2022-26',
-        schoolName: 'School of Engineering',
-        hodName: 'Dr. Ramesh Kumar',
-        teamName: 'CyberKnights'
-      })
-    },
-    {
-      label: 'Meera (MEC-01, QuantumForge)',
-      data: JSON.stringify({
-        type: 'ARENIUM_PARTICIPANT',
-        id: 'mem-4',
-        name: 'Meera Nambiar',
-        rollNumber: '20231MEC0014',
-        section: 'MEC-01',
-        batchNumber: 'Batch 2023-27',
-        schoolName: 'School of Engineering',
-        hodName: 'Dr. Priya Sharma',
-        teamName: 'QuantumForge'
-      })
-    }
-  ];
 
   useEffect(() => {
     if (!isOpen) {
@@ -100,7 +51,7 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess, title, 
       setCameraActive(true);
     } catch (err) {
       console.warn('Camera failed to start:', err);
-      setCameraError('Camera access unavailable or restricted in this browser session. You can use the instant 1-click test presets or search bar below.');
+      setCameraError('Camera access unavailable or restricted in this browser session. You can enter the Roll Number or Team Name manually below.');
       setCameraActive(false);
     }
   };
@@ -133,7 +84,7 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess, title, 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-2xs animate-in fade-in">
-      <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden max-h-[92vh] flex flex-col">
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden max-h-[92vh] flex flex-col">
         
         {/* Header */}
         <div className="flex items-center justify-between p-4 sm:p-5 bg-gradient-to-r from-[#92EEFF]/30 to-[#30AFFF]/20 border-b border-slate-200 text-slate-900 shrink-0">
@@ -157,7 +108,7 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess, title, 
         {/* Scrollable Content */}
         <div className="p-4 sm:p-6 space-y-4 overflow-y-auto">
           {/* Camera Viewport */}
-          <div className="relative w-full aspect-square max-w-[240px] sm:max-w-[270px] mx-auto rounded-2xl overflow-hidden bg-slate-950 border-2 border-dashed border-[#30AFFF] flex items-center justify-center shadow-inner">
+          <div className="relative w-full aspect-square max-w-[260px] mx-auto rounded-2xl overflow-hidden bg-slate-950 border-2 border-dashed border-[#30AFFF] flex items-center justify-center shadow-inner">
             <div id="reader-container" className="w-full h-full"></div>
             
             {!cameraActive && (
@@ -168,57 +119,35 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess, title, 
                 </span>
                 {cameraError && (
                   <p className="text-[10px] text-slate-400">
-                    Use the 1-click test badges below to scan instantly
+                    Enter the Roll Number or Team Name in the manual field below
                   </p>
                 )}
               </div>
             )}
           </div>
 
-          {/* 1-Click Simulated QR Presets for quick touch testing on phones */}
-          <div className="bg-[#D8FFC5]/40 border border-[#C4F7CA] p-3.5 rounded-2xl">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-emerald-700" />
-                Instant 1-Tap Mobile Scan:
-              </span>
-              <span className="text-[10px] font-semibold text-emerald-800 bg-[#C4F7CA] px-2 py-0.5 rounded-full">
-                Mock Scan
-              </span>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              {SAMPLE_PRESETS.map((p, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => handleSuccess(p.data)}
-                  className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold bg-white hover:bg-emerald-50/70 border border-emerald-200/80 text-slate-800 transition-all text-left shadow-2xs active:scale-[0.98]"
-                >
-                  <span className="truncate pr-2">{p.label}</span>
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                </button>
-              ))}
-            </div>
+          <div className="text-center text-xs text-slate-500">
+            Point camera at the participant's dynamic QR pass, or enter the ID below.
           </div>
 
           {/* Manual Input */}
-          <form onSubmit={handleManualSubmit} className="space-y-1.5">
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              Or Enter Roll Number / QR Data:
+          <form onSubmit={handleManualSubmit} className="space-y-1.5 pt-2 border-t border-slate-100">
+            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+              {mode === 'TEAM' ? 'Manual Team Name Input:' : 'Manual Roll Number / QR Data Input:'}
             </label>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
-                placeholder={mode === 'TEAM' ? 'Team Name (e.g. CyberKnights)' : 'Roll No or JSON'}
-                className="flex-1 px-3 py-2 text-xs border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#30AFFF]"
+                placeholder={mode === 'TEAM' ? 'Enter Team Name...' : 'Enter Roll No (e.g. 20231CSE0001)...'}
+                className="flex-1 px-3 py-2.5 text-xs border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#30AFFF]"
               />
               <button
                 type="submit"
-                className="px-4 py-2 text-xs font-bold bg-[#30AFFF] text-white rounded-xl hover:bg-[#2090e0] shadow-xs active:scale-95"
+                className="px-4 py-2.5 text-xs font-bold bg-[#30AFFF] text-white rounded-xl hover:bg-[#2090e0] shadow-xs active:scale-95 transition-all"
               >
-                Scan
+                Submit
               </button>
             </div>
           </form>

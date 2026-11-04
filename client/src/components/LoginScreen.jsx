@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { Shield, Award, UserCheck, Users, ArrowRight, KeyRound, Mail, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Shield, Award, UserCheck, Users, ArrowRight, KeyRound, Mail, Sparkles, AlertCircle } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 
 export default function LoginScreen({ onLoginSuccess }) {
   const [selectedRole, setSelectedRole] = useState('PARTICIPANT');
-  const [teamName, setTeamName] = useState('CyberKnights');
+  const [teamName, setTeamName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // REAL AUTHENTICATED CREDENTIALS ONLY
   const CORE_ACCOUNTS = [
     { email: 'singhkaushal.2507@gmail.com', pass: 'Kaush2507', name: 'Kaushal Singh' },
     { email: 'Kathuriaabhyas@gmail.com', pass: 'Abhyas2108', name: 'Abhyas Kathuria' },
@@ -22,13 +23,6 @@ export default function LoginScreen({ onLoginSuccess }) {
     { email: 'Kathuriaabhyas0@gmail.com', pass: 'Abhyas2108', name: 'Abhyas Kathuria' }
   ];
 
-  const SAMPLE_TEAMS = ['CyberKnights', 'QuantumForge', 'Nexus27', 'AlgoWarriors'];
-
-  const SAMPLE_VOLUNTEERS = [
-    { email: 'volunteer1@arenium.com', pass: 'Vol123', name: 'Rohan Verma (Approved)' },
-    { email: 'ananya.vol@arenium.com', pass: 'Vol123', name: 'Ananya Sharma (Pending Approval)' }
-  ];
-
   const handleRoleChange = (role) => {
     setSelectedRole(role);
     setErrorMessage('');
@@ -38,11 +32,9 @@ export default function LoginScreen({ onLoginSuccess }) {
     } else if (role === 'ADMIN') {
       setEmail(ADMIN_ACCOUNTS[0].email);
       setPassword(ADMIN_ACCOUNTS[0].pass);
-    } else if (role === 'VOLUNTEER') {
-      setEmail(SAMPLE_VOLUNTEERS[0].email);
-      setPassword(SAMPLE_VOLUNTEERS[0].pass);
-    } else if (role === 'PARTICIPANT') {
-      setTeamName('CyberKnights');
+    } else {
+      setEmail('');
+      setPassword('');
     }
   };
 
@@ -181,7 +173,7 @@ export default function LoginScreen({ onLoginSuccess }) {
                     Participant Login with Team Name
                   </h3>
                   <p className="text-xs text-slate-600 mt-1">
-                    Participants sign in with their registered <strong>Team Name</strong> to retrieve QR passes and submit hourly OD applications.
+                    Enter your registered <strong>Team Name</strong> to access your Team QR code, individual gate passes, and submit hourly OD applications. New teams are automatically created upon initial sign in.
                   </p>
                 </div>
 
@@ -193,33 +185,13 @@ export default function LoginScreen({ onLoginSuccess }) {
                     type="text"
                     value={teamName}
                     onChange={(e) => setTeamName(e.target.value)}
-                    placeholder="e.g. CyberKnights or QuantumForge"
+                    placeholder="e.g. Your Team Name / Project Title"
                     required
                     className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#30AFFF] text-sm font-semibold text-slate-900 bg-white"
                   />
-                </div>
-
-                {/* Quick Team selector pills */}
-                <div>
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">
-                    1-Click Sample Teams:
-                  </span>
-                  <div className="flex flex-wrap gap-2">
-                    {SAMPLE_TEAMS.map((name) => (
-                      <button
-                        key={name}
-                        type="button"
-                        onClick={() => setTeamName(name)}
-                        className={`text-xs px-3.5 py-1.5 rounded-xl border transition-all font-semibold ${
-                          teamName === name
-                            ? 'bg-[#30AFFF] text-white border-[#30AFFF] shadow-xs'
-                            : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
-                        }`}
-                      >
-                        {name}
-                      </button>
-                    ))}
-                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1.5">
+                    All members of your team can log in using this team name.
+                  </p>
                 </div>
               </div>
             )}
@@ -240,7 +212,7 @@ export default function LoginScreen({ onLoginSuccess }) {
                 {/* Quick Presets for Core Team */}
                 <div>
                   <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">
-                    1-Click Select Core Account:
+                    Official Core Team Accounts:
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {CORE_ACCOUNTS.map((acc) => (
@@ -308,33 +280,9 @@ export default function LoginScreen({ onLoginSuccess }) {
                   <p className="text-xs text-emerald-800 mt-1">
                     Scan participant QR passes to allot hourly attendance and verify team registrations.
                     <span className="block font-semibold mt-0.5 text-slate-700">
-                      Note: Requires Admin approval before login is activated.
+                      Note: Volunteers are registered by the Core Team and must be approved by the Admin before logging in.
                     </span>
                   </p>
-                </div>
-
-                {/* Preset Volunteers */}
-                <div>
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">
-                    1-Click Volunteer Presets:
-                  </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {SAMPLE_VOLUNTEERS.map((v) => (
-                      <button
-                        key={v.email}
-                        type="button"
-                        onClick={() => pickPreset(v.email, v.pass)}
-                        className={`p-3 rounded-xl text-left border transition-all ${
-                          email === v.email
-                            ? 'bg-[#D8FFC5]/50 border-emerald-400 text-slate-900 shadow-xs'
-                            : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
-                        }`}
-                      >
-                        <div className="text-xs font-bold text-slate-900">{v.name}</div>
-                        <div className="text-[11px] text-slate-500 truncate">{v.email}</div>
-                      </button>
-                    ))}
-                  </div>
                 </div>
 
                 <div>
@@ -347,7 +295,7 @@ export default function LoginScreen({ onLoginSuccess }) {
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="volunteer1@arenium.com"
+                      placeholder="Enter your registered volunteer email"
                       required
                       className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#30AFFF] text-sm text-slate-900 bg-white"
                     />
@@ -389,7 +337,7 @@ export default function LoginScreen({ onLoginSuccess }) {
                 {/* Quick Presets for Admin */}
                 <div>
                   <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">
-                    1-Click Select Admin Account:
+                    Official Admin Accounts:
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {ADMIN_ACCOUNTS.map((acc) => (
@@ -469,7 +417,7 @@ export default function LoginScreen({ onLoginSuccess }) {
         {/* Footer info */}
         <div className="px-8 py-3.5 bg-slate-50 border-t border-slate-200/80 text-center">
           <p className="text-xs text-slate-500 font-medium">
-            ARENIUM 27 • Presidency University Tech Festival • Fast QR & Attendance Operations
+            ARENIUM 27 • Presidency University Tech Festival • Production Launch Ready
           </p>
         </div>
 

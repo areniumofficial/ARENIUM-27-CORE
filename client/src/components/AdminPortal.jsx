@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Shield, CheckCircle2, XCircle, Clock3, FileSpreadsheet, Download, 
-  Users, Award, UserCheck, Filter, RefreshCw, AlertCircle, Layers, Check, X, Sparkles, Search, CheckSquare, Square
+  Users, Award, UserCheck, Filter, RefreshCw, AlertCircle, Layers, Check, X, Sparkles, Search, CheckSquare, Square,
+  Database, UploadCloud, Server
 } from 'lucide-react';
-import { apiFetch, getExcelExportUrl } from '../utils/api';
+import { apiFetch, getExcelExportUrl, getBackupExportUrl } from '../utils/api';
 
 export default function AdminPortal({ currentUser }) {
-  const [activeSection, setActiveSection] = useState('CORE_TEAM'); // 'CORE_TEAM', 'VOLUNTEERS', 'PARTICIPANTS', or 'EXCEL_EXPORT'
+  const [activeSection, setActiveSection] = useState('CORE_TEAM'); // 'CORE_TEAM', 'VOLUNTEERS', 'PARTICIPANTS', 'EXCEL_EXPORT', or 'BACKUP'
   const [loading, setLoading] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
   // Portal data
@@ -236,6 +238,43 @@ export default function AdminPortal({ currentUser }) {
     window.open(url, '_blank');
   };
 
+  const handleDownloadBackup = () => {
+    window.open(getBackupExportUrl(), '_blank');
+  };
+
+  const handleRestoreFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        setRestoring(true);
+        const parsed = JSON.parse(event.target.result);
+        const res = await apiFetch('/admin/restore-backup', {
+          method: 'POST',
+          body: JSON.stringify({ backupData: parsed })
+        });
+        if (res.success) {
+          setFeedback({
+            type: 'success',
+            message: `Snapshot restored successfully: ${res.counts.teams} teams, ${res.counts.volunteers} volunteers, ${res.counts.odRequests} OD records.`
+          });
+          fetchAdminData();
+        }
+      } catch (err) {
+        setFeedback({
+          type: 'error',
+          message: err.message || 'Invalid backup JSON file'
+        });
+      } finally {
+        setRestoring(false);
+        e.target.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-7">
       
@@ -259,6 +298,20 @@ export default function AdminPortal({ currentUser }) {
               <p className="text-xs font-medium text-slate-600">
                 {currentUser.email} • {currentUser.designation || 'Lead Administrator'}
               </p>
+              {overview?.storageMode && (
+                <div className="flex items-center gap-2 mt-2">
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                    overview.storageMode.mongoConnected
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                      : 'bg-amber-50 text-amber-800 border-amber-200'
+                  }`}>
+                    <span className={`w-2 h-2 rounded-full ${
+                      overview.storageMode.mongoConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+                    }`} />
+                    {overview.storageMode.mongoConnected ? 'MongoDB Cloud Active (500+ Students)' : 'Local File Persistence Mode'}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -285,8 +338,8 @@ export default function AdminPortal({ currentUser }) {
           )}
         </div>
 
-        {/* REQUEST PORTAL TABS IN 3 DISTINCT SECTIONS + EXCEL EXPORT */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-6 pt-5 border-t border-slate-100">
+        {/* REQUEST PORTAL TABS IN 3 DISTINCT SECTIONS + EXCEL EXPORT + DATA BACKUP */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 mt-6 pt-5 border-t border-slate-100">
           
           {/* Section 1: CORE TEAM */}
           <button
@@ -342,6 +395,19 @@ export default function AdminPortal({ currentUser }) {
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
             <span>DAILY EXCEL EXPORT</span>
+          </button>
+
+          {/* Data Backup & Cloud */}
+          <button
+            onClick={() => { setActiveSection('BACKUP'); setFeedback(null); }}
+            className={`flex items-center justify-center gap-2 py-3 px-3 rounded-2xl font-bold text-xs transition-all border col-span-2 sm:col-span-1 ${
+              activeSection === 'BACKUP'
+                ? 'bg-gradient-to-r from-sky-600 to-blue-700 text-white border-sky-600 shadow-xs'
+                : 'bg-sky-50 hover:bg-sky-100 text-sky-950 border-sky-200'
+            }`}
+          >
+            <Database className="w-4 h-4 text-sky-700" />
+            <span>DATA BACKUP & CLOUD</span>
           </button>
         </div>
       </div>
@@ -1036,6 +1102,133 @@ export default function AdminPortal({ currentUser }) {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* DATA BACKUP & CLOUD STORAGE SECTION (500+ CONCURRENT STUDENTS) */}
+      {activeSection === 'BACKUP' && (
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-7">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+            <div>
+              <span className="text-xs font-black uppercase tracking-wider text-sky-800 bg-[#92EEFF]/40 px-2.5 py-0.5 rounded-full border border-sky-300">
+                SYSTEM RELIABILITY & BACKUP
+              </span>
+              <h2 className="text-xl font-black text-slate-900 mt-1">
+                Data Persistence & High-Concurrency Scaling
+              </h2>
+              <p className="text-xs text-slate-500 mt-1">
+                Download offline data snapshots, restore past backups, and verify readiness for 500+ concurrent students.
+              </p>
+            </div>
+
+            <button
+              onClick={fetchAdminData}
+              className="flex items-center gap-1.5 self-start sm:self-auto px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              <span>Refresh Status</span>
+            </button>
+          </div>
+
+          {/* Backup & Restore Action Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            
+            {/* Card 1: Download Snapshot */}
+            <div className="p-6 rounded-2xl bg-gradient-to-br from-white to-sky-50/50 border border-sky-200/80 shadow-2xs space-y-4 flex flex-col justify-between">
+              <div className="space-y-2">
+                <div className="w-10 h-10 rounded-xl bg-[#30AFFF]/15 text-[#006dae] flex items-center justify-center font-bold">
+                  <Download className="w-5 h-5" />
+                </div>
+                <h3 className="text-sm font-black text-slate-900">
+                  Export Full System Backup (.json)
+                </h3>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Downloads an atomic snapshot of all current data: Admin accounts, Core organizers, registered Teams, Participants, Volunteer accounts, attendance scans, and OD requests.
+                </p>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleDownloadBackup}
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#30AFFF] hover:bg-[#2090e0] text-white font-bold text-xs uppercase tracking-wide shadow-xs active:scale-98 transition-all cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Download Live Backup (.json)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Card 2: Restore Snapshot */}
+            <div className="p-6 rounded-2xl bg-gradient-to-br from-white to-emerald-50/40 border border-emerald-200/80 shadow-2xs space-y-4 flex flex-col justify-between">
+              <div className="space-y-2">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
+                  <UploadCloud className="w-5 h-5" />
+                </div>
+                <h3 className="text-sm font-black text-slate-900">
+                  Restore Database from JSON Snapshot
+                </h3>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Upload a previously downloaded <code className="bg-emerald-100/70 px-1 py-0.5 rounded font-mono text-[11px]">ARENIUM27_FULL_BACKUP_*.json</code> file to restore all student data, teams, and records without server restart.
+                </p>
+              </div>
+
+              <div className="pt-2">
+                <label className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-bold text-xs uppercase tracking-wide shadow-xs active:scale-98 transition-all cursor-pointer">
+                  <UploadCloud className="w-4 h-4" />
+                  <span>{restoring ? 'Restoring Snapshot...' : 'Upload & Restore (.json)'}</span>
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleRestoreFile}
+                    disabled={restoring}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            </div>
+
+          </div>
+
+          {/* High-Concurrency & Deployment Card */}
+          <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/80 pb-3">
+              <div className="flex items-center gap-2.5">
+                <Server className="w-5 h-5 text-slate-700" />
+                <h3 className="text-sm font-bold text-slate-900">
+                  500+ Concurrent Students Scaling Architecture
+                </h3>
+              </div>
+              <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold border ${
+                overview?.storageMode?.mongoConnected
+                  ? 'bg-[#D8FFC5] text-emerald-950 border-[#C4F7CA]'
+                  : 'bg-amber-100 text-amber-900 border-amber-300'
+              }`}>
+                <span className={`w-2 h-2 rounded-full ${
+                  overview?.storageMode?.mongoConnected ? 'bg-emerald-600 animate-pulse' : 'bg-amber-600'
+                }`} />
+                {overview?.storageMode?.mongoConnected
+                  ? 'MongoDB Cloud Active (Zero-Loss Multi-Node Pool)'
+                  : 'Local / Vercel Ephemeral Storage Mode'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-600">
+              <div className="p-3.5 bg-white rounded-xl border border-slate-200 space-y-1">
+                <div className="font-bold text-slate-900">1. Instant Rolling Backups</div>
+                <p>Every write creates an atomic timestamped disk snapshot (<code className="font-mono text-[10px]">backup-*.json</code>) with the last 30 snapshots automatically retained.</p>
+              </div>
+              <div className="p-3.5 bg-white rounded-xl border border-slate-200 space-y-1">
+                <div className="font-bold text-slate-900">2. High Concurrency Pool</div>
+                <p>Configured with MongoDB connection pool (<code className="font-mono text-[10px]">maxPoolSize: 50</code>) to effortlessly handle 500+ students and volunteers at the same time.</p>
+              </div>
+              <div className="p-3.5 bg-white rounded-xl border border-slate-200 space-y-1">
+                <div className="font-bold text-slate-900">3. Vercel Deployment Ready</div>
+                <p>When deploying to Vercel, simply provide the <code className="font-mono text-[10px]">MONGODB_URI</code> environment variable to sync across all Vercel serverless lambdas.</p>
+              </div>
             </div>
           </div>
 

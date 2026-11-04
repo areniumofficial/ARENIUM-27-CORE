@@ -21,14 +21,14 @@ export default function CorePortal({ currentUser }) {
   // Volunteer Addition Form State
   const [volName, setVolName] = useState('');
   const [volEmail, setVolEmail] = useState('');
-  const [volPassword, setVolPassword] = useState('Vol123');
+  const [volPassword, setVolPassword] = useState('');
   const [volRollNumber, setVolRollNumber] = useState('');
-  const [volSection, setVolSection] = useState('CSE-03');
-  const [volBatch, setVolBatch] = useState('Batch 2022-26');
-  const [volSchool, setVolSchool] = useState('School of Engineering');
-  const [volHod, setVolHod] = useState('Dr. Ramesh Kumar');
+  const [volSection, setVolSection] = useState('');
+  const [volBatch, setVolBatch] = useState('');
+  const [volSchool, setVolSchool] = useState('');
+  const [volHod, setVolHod] = useState('');
   const [volDutyRole, setVolDutyRole] = useState('Participant QR Attendance & Floor Usher');
-  const [volPhone, setVolPhone] = useState('+91 9');
+  const [volPhone, setVolPhone] = useState('');
   const [volunteerList, setVolunteerList] = useState([]);
   const [volSearch, setVolSearch] = useState('');
 

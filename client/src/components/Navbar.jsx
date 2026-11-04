@@ -40,35 +40,33 @@ export default function Navbar({ currentUser, onLogout, onQuickSwitch, serverOnl
     }
   };
 
+  // REAL OFFICIAL ACCOUNTS ONLY
   const QUICK_PERSONAS = [
     { label: 'Admin (Prof. Keren)', role: 'ADMIN', email: 'kerenlois@presidencyuniversity.in', pass: 'Kerensois27' },
     { label: 'Admin (Abhyas)', role: 'ADMIN', email: 'Kathuriaabhyas0@gmail.com', pass: 'Abhyas2108' },
     { label: 'Core (Kaushal)', role: 'CORE_TEAM', email: 'singhkaushal.2507@gmail.com', pass: 'Kaush2507' },
-    { label: 'Volunteer (Rohan)', role: 'VOLUNTEER', email: 'volunteer1@arenium.com', pass: 'Vol123' },
-    { label: 'Team: CyberKnights', role: 'PARTICIPANT', teamName: 'CyberKnights' },
-    { label: 'Team: QuantumForge', role: 'PARTICIPANT', teamName: 'QuantumForge' }
+    { label: 'Core (Abhyas)', role: 'CORE_TEAM', email: 'Kathuriaabhyas@gmail.com', pass: 'Abhyas2108' },
+    { label: 'Core (Ashlin)', role: 'CORE_TEAM', email: 'ashlinsiddharth1@gmail.com', pass: 'Ashlin01' },
+    { label: 'Core (Vimal)', role: 'CORE_TEAM', email: 'vimalrajsnkk@gmail.com', pass: 'Vimal69' }
   ];
 
   return (
     <>
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
         
-        {/* Top Demo Quick-Persona Bar (Touch-scrollable on phone) */}
+        {/* Top Official Quick-Account Bar */}
         <div className="bg-gradient-to-r from-[#92EEFF]/15 via-[#FBFBFB] to-[#D8FFC5]/20 border-b border-slate-200/60 px-3 sm:px-4 py-1.5 overflow-x-auto no-scrollbar touch-pan-x">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-2.5 text-[11px]">
             <div className="flex items-center gap-1.5 shrink-0">
               <span className="flex items-center gap-1 font-bold text-slate-700 uppercase tracking-wider text-[10px] bg-white px-2 py-0.5 rounded-full border border-slate-200 shadow-2xs">
                 <Sparkles className="w-3 h-3 text-[#30AFFF]" />
-                Switch Role:
+                Official Team:
               </span>
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0 overflow-x-auto py-0.5">
               {QUICK_PERSONAS.map((p, idx) => {
-                const isActive = currentUser && (
-                  (p.role === 'PARTICIPANT' && currentUser.role === 'PARTICIPANT' && currentUser.teamName === p.teamName) ||
-                  (p.email && currentUser.email === p.email)
-                );
+                const isActive = currentUser && currentUser.email === p.email;
 
                 return (
                   <button

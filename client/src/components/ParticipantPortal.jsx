@@ -20,10 +20,10 @@ export default function ParticipantPortal({ currentUser }) {
   const [showAddMember, setShowAddMember] = useState(false);
   const [newMemName, setNewMemName] = useState('');
   const [newMemRoll, setNewMemRoll] = useState('');
-  const [newMemSection, setNewMemSection] = useState('CSE-02');
-  const [newMemBatch, setNewMemBatch] = useState('Batch 2023-27');
-  const [newMemSchool, setNewMemSchool] = useState('School of Engineering');
-  const [newMemHod, setNewMemHod] = useState('Dr. Ramesh Kumar');
+  const [newMemSection, setNewMemSection] = useState('');
+  const [newMemBatch, setNewMemBatch] = useState('');
+  const [newMemSchool, setNewMemSchool] = useState('');
+  const [newMemHod, setNewMemHod] = useState('');
 
   const TIMETABLE_HOURS = [
     { hr: 1, label: 'Hour 1', time: '09:00 - 10:00' },

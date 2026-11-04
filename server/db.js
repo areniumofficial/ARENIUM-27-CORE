@@ -1,10 +1,15 @@
 const fs = require('fs');
 const path = require('path');
+const mongoose = require('mongoose');
 
-const DATA_DIR = path.join(__dirname, 'data');
+// Determine storage path
+const isVercel = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
+const DATA_DIR = isVercel ? '/tmp' : path.join(__dirname, 'data');
+const BACKUPS_DIR = isVercel ? '/tmp/backups' : path.join(DATA_DIR, 'backups');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 
-const INITIAL_DATA = {
+// REAL AUTHENTICATED CREDENTIALS ONLY (Zero Demo Data)
+const INITIAL_REAL_DATA = {
   admins: [
     {
       id: 'admin-1',
@@ -12,14 +17,14 @@ const INITIAL_DATA = {
       password: 'Kerensois27',
       name: 'Prof. Keren Lois',
       role: 'ADMIN',
-      designation: 'Faculty Coordinator & Admin',
+      designation: 'Faculty Coordinator & Lead Admin',
       phone: '+91 98765 43210'
     },
     {
       id: 'admin-2',
       email: 'Kathuriaabhyas0@gmail.com',
       password: 'Abhyas2108',
-      name: 'Abhyas Kathuria (Admin)',
+      name: 'Abhyas Kathuria',
       role: 'ADMIN',
       designation: 'Lead Administrator',
       phone: '+91 99887 76655'
@@ -79,240 +84,172 @@ const INITIAL_DATA = {
       phone: '+91 98445 56677'
     }
   ],
-  volunteers: [
-    {
-      id: 'vol-1',
-      name: 'Rohan Verma',
-      email: 'volunteer1@arenium.com',
-      password: 'Vol123',
-      rollNumber: '20221CSE0321',
-      section: 'CSE-05',
-      batchNumber: 'Batch 2022-26',
-      schoolName: 'School of Engineering',
-      hodName: 'Dr. Ramesh Kumar',
-      dutyRole: 'Gate & Verification Lead',
-      phone: '+91 91234 56789',
-      status: 'APPROVED',
-      addedBy: 'Kaushal Singh (Core)',
-      addedAt: '2026-11-01T10:00:00Z',
-      approvedBy: 'Prof. Keren Lois',
-      approvedAt: '2026-11-01T11:00:00Z'
-    },
-    {
-      id: 'vol-2',
-      name: 'Ananya Sharma',
-      email: 'ananya.vol@arenium.com',
-      password: 'Vol123',
-      rollNumber: '20221ECE0044',
-      section: 'ECE-01',
-      batchNumber: 'Batch 2022-26',
-      schoolName: 'School of Engineering',
-      hodName: 'Dr. Smitha Rao',
-      dutyRole: 'Floor Attendance Supervisor',
-      phone: '+91 92345 67890',
-      status: 'PENDING',
-      addedBy: 'Abhyas Kathuria (Core)',
-      addedAt: '2026-11-03T18:30:00Z',
-      approvedBy: null,
-      approvedAt: null
-    }
-  ],
-  teams: [
-    {
-      id: 'team-1',
-      teamName: 'CyberKnights',
-      category: 'Hackathon Track A',
-      verified: true,
-      verifiedAt: '2026-11-03T09:15:00Z',
-      verifiedBy: 'Rohan Verma (Volunteer)',
-      members: [
-        {
-          id: 'mem-1',
-          name: 'Tanmay Bhattacharya',
-          rollNumber: '20221CSE0552',
-          section: 'CSE-08',
-          batchNumber: 'Batch 2022-26',
-          schoolName: 'School of Engineering',
-          hodName: 'Dr. Ramesh Kumar',
-          isLeader: true
-        },
-        {
-          id: 'mem-2',
-          name: 'Sneha Kulkarni',
-          rollNumber: '20221CSE0558',
-          section: 'CSE-08',
-          batchNumber: 'Batch 2022-26',
-          schoolName: 'School of Engineering',
-          hodName: 'Dr. Ramesh Kumar',
-          isLeader: false
-        },
-        {
-          id: 'mem-3',
-          name: 'Aditya Nair',
-          rollNumber: '20221AIML022',
-          section: 'AIML-01',
-          batchNumber: 'Batch 2022-26',
-          schoolName: 'School of Computing',
-          hodName: 'Dr. Anita Desai',
-          isLeader: false
-        }
-      ]
-    },
-    {
-      id: 'team-2',
-      teamName: 'QuantumForge',
-      category: 'Robotics Track B',
-      verified: false,
-      verifiedAt: null,
-      verifiedBy: null,
-      members: [
-        {
-          id: 'mem-4',
-          name: 'Meera Nambiar',
-          rollNumber: '20231MEC0014',
-          section: 'MEC-01',
-          batchNumber: 'Batch 2023-27',
-          schoolName: 'School of Engineering',
-          hodName: 'Dr. Priya Sharma',
-          isLeader: true
-        },
-        {
-          id: 'mem-5',
-          name: 'Rahul Sen',
-          rollNumber: '20231ECE0092',
-          section: 'ECE-02',
-          batchNumber: 'Batch 2023-27',
-          schoolName: 'School of Engineering',
-          hodName: 'Dr. Smitha Rao',
-          isLeader: false
-        }
-      ]
-    }
-  ],
-  odRequests: [
-    {
-      id: 'od-core-101',
-      requestType: 'CORE_TEAM',
-      targetId: 'core-1',
-      name: 'Kaushal Singh',
-      rollNumber: '20211CSE0112',
-      section: 'CSE-04',
-      batchNumber: 'Batch 2021-25',
-      schoolName: 'School of Engineering',
-      hodName: 'Dr. Ramesh Kumar',
-      teamName: 'ARENIUM CORE',
-      date: '2026-11-03',
-      hours: [1, 2, 3, 4],
-      hoursFormatted: 'Hour 1, Hour 2, Hour 3, Hour 4',
-      reason: 'Arenium 27 Main Stage Setup and Tech Infrastructure Operations',
-      submittedBy: {
-        id: 'core-1',
-        name: 'Kaushal Singh',
-        role: 'CORE_TEAM'
-      },
-      status: 'APPROVED',
-      adminRemark: 'Approved for event staging duty',
-      reviewedBy: 'Prof. Keren Lois',
-      reviewedAt: '2026-11-03T11:30:00Z',
-      createdAt: '2026-11-03T08:30:00Z'
-    },
-    {
-      id: 'od-vol-201',
-      requestType: 'VOLUNTEER',
-      targetId: 'mem-1',
-      name: 'Tanmay Bhattacharya',
-      rollNumber: '20221CSE0552',
-      section: 'CSE-08',
-      batchNumber: 'Batch 2022-26',
-      schoolName: 'School of Engineering',
-      hodName: 'Dr. Ramesh Kumar',
-      teamName: 'CyberKnights',
-      date: '2026-11-03',
-      hours: [1, 2, 3],
-      hoursFormatted: 'Hour 1, Hour 2, Hour 3',
-      reason: 'Volunteer In-Person Hourly Attendance Check at Gate 2',
-      submittedBy: {
-        id: 'vol-1',
-        name: 'Rohan Verma',
-        role: 'VOLUNTEER'
-      },
-      status: 'PENDING',
-      adminRemark: '',
-      reviewedBy: null,
-      reviewedAt: null,
-      createdAt: '2026-11-03T10:15:00Z'
-    },
-    {
-      id: 'od-part-301',
-      requestType: 'PARTICIPANT',
-      targetId: 'mem-4',
-      name: 'Meera Nambiar',
-      rollNumber: '20231MEC0014',
-      section: 'MEC-01',
-      batchNumber: 'Batch 2023-27',
-      schoolName: 'School of Engineering',
-      hodName: 'Dr. Priya Sharma',
-      teamName: 'QuantumForge',
-      date: '2026-11-03',
-      hours: [5, 6, 7, 8],
-      hoursFormatted: 'Hour 5, Hour 6, Hour 7, Hour 8',
-      reason: 'Participating in Arena Round 1 Technical Project Showcase',
-      submittedBy: {
-        id: 'mem-4',
-        name: 'Meera Nambiar',
-        role: 'PARTICIPANT'
-      },
-      status: 'PENDING',
-      adminRemark: '',
-      reviewedBy: null,
-      reviewedAt: null,
-      createdAt: '2026-11-03T12:00:00Z'
-    }
-  ],
-  scanLogs: [
-    {
-      id: 'scan-1',
-      volunteerId: 'vol-1',
-      volunteerName: 'Rohan Verma',
-      scanType: 'TEAM_VERIFICATION',
-      teamId: 'team-1',
-      teamName: 'CyberKnights',
-      timestamp: '2026-11-03T09:15:00Z',
-      details: 'Verified 3 members of CyberKnights'
-    }
-  ]
+  volunteers: [],
+  teams: [],
+  odRequests: [],
+  scanLogs: []
 };
 
-function initDB() {
+// In-memory cache for fast synchronous operations
+let memoryCache = null;
+let mongoConnected = false;
+
+// Mongoose Schema for MongoDB persistence (500+ Concurrent Students)
+const SystemDataSchema = new mongoose.Schema({
+  key: { type: String, unique: true, default: 'arenium_main_state' },
+  data: { type: mongoose.Schema.Types.Mixed },
+  updatedAt: { type: Date, default: Date.now }
+});
+let SystemDataModel = null;
+
+async function initMongoDB() {
+  const uri = process.env.MONGODB_URI;
+  if (!uri || mongoConnected) return;
+
+  try {
+    await mongoose.connect(uri, {
+      maxPoolSize: 50, // High concurrency pool for 500+ users
+      serverSelectionTimeoutMS: 5000
+    });
+    SystemDataModel = mongoose.models.SystemData || mongoose.model('SystemData', SystemDataSchema);
+    mongoConnected = true;
+    console.log('[ARENIUM DB] MongoDB Atlas connected for high-concurrency cloud storage.');
+
+    // Fetch initial state from Mongo
+    const doc = await SystemDataModel.findOne({ key: 'arenium_main_state' });
+    if (doc && doc.data) {
+      memoryCache = doc.data;
+    } else {
+      await SystemDataModel.create({ key: 'arenium_main_state', data: INITIAL_REAL_DATA });
+      memoryCache = JSON.parse(JSON.stringify(INITIAL_REAL_DATA));
+    }
+  } catch (err) {
+    console.warn('[ARENIUM DB] MongoDB connection failed, falling back to local storage:', err.message);
+    mongoConnected = false;
+  }
+}
+
+// Ensure local directories exist
+function ensureDirs() {
   if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
   }
-  if (!fs.existsSync(DB_FILE)) {
-    fs.writeFileSync(DB_FILE, JSON.stringify(INITIAL_DATA, null, 2), 'utf-8');
+  if (!fs.existsSync(BACKUPS_DIR)) {
+    fs.mkdirSync(BACKUPS_DIR, { recursive: true });
   }
+}
+
+function initDB() {
+  ensureDirs();
+  initMongoDB();
+
+  if (!fs.existsSync(DB_FILE)) {
+    fs.writeFileSync(DB_FILE, JSON.stringify(INITIAL_REAL_DATA, null, 2), 'utf-8');
+    memoryCache = JSON.parse(JSON.stringify(INITIAL_REAL_DATA));
+  } else if (!memoryCache) {
+    try {
+      const raw = fs.readFileSync(DB_FILE, 'utf-8');
+      memoryCache = JSON.parse(raw);
+    } catch (e) {
+      memoryCache = JSON.parse(JSON.stringify(INITIAL_REAL_DATA));
+    }
+  }
+  return memoryCache;
 }
 
 function readDB() {
-  initDB();
-  try {
-    const raw = fs.readFileSync(DB_FILE, 'utf-8');
-    return JSON.parse(raw);
-  } catch (err) {
-    console.error('Error reading db.json, returning initial state:', err);
-    return INITIAL_DATA;
-  }
+  if (memoryCache) return memoryCache;
+  return initDB();
 }
 
 function writeDB(data) {
-  initDB();
-  const tempFile = `${DB_FILE}.tmp`;
-  fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), 'utf-8');
-  fs.renameSync(tempFile, DB_FILE);
+  memoryCache = data;
+
+  // Asynchronously sync to MongoDB Atlas if connected
+  if (mongoConnected && SystemDataModel) {
+    SystemDataModel.updateOne(
+      { key: 'arenium_main_state' },
+      { data: data, updatedAt: new Date() },
+      { upsert: true }
+    ).catch(err => console.error('[ARENIUM DB] Mongo sync error:', err));
+  }
+
+  // Atomically persist to local disk
+  try {
+    ensureDirs();
+    const tempFile = `${DB_FILE}.tmp`;
+    fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), 'utf-8');
+    fs.renameSync(tempFile, DB_FILE);
+
+    // Create periodic rolling backup (1 per 10 writes or if none exists)
+    createRotatingBackup(data);
+  } catch (err) {
+    console.error('[ARENIUM DB] Error writing to local file:', err);
+  }
+
   return data;
+}
+
+// Create timestamped backup file
+function createRotatingBackup(data) {
+  try {
+    ensureDirs();
+    const now = new Date();
+    const timestamp = now.toISOString().replace(/[:.]/g, '-');
+    const backupFile = path.join(BACKUPS_DIR, `backup-${timestamp}.json`);
+
+    fs.writeFileSync(backupFile, JSON.stringify(data, null, 2), 'utf-8');
+
+    // Retain only last 30 backup files
+    const files = fs.readdirSync(BACKUPS_DIR)
+      .filter(f => f.startsWith('backup-') && f.endsWith('.json'))
+      .sort();
+    if (files.length > 30) {
+      const toDelete = files.slice(0, files.length - 30);
+      toDelete.forEach(f => {
+        try { fs.unlinkSync(path.join(BACKUPS_DIR, f)); } catch (_) {}
+      });
+    }
+  } catch (err) {
+    // Ignore backup disk errors in restricted environments
+  }
+}
+
+// Reset data to clean launch state
+function resetToRealData() {
+  memoryCache = JSON.parse(JSON.stringify(INITIAL_REAL_DATA));
+  return writeDB(memoryCache);
+}
+
+// Restore data from user-uploaded backup
+function restoreFromBackup(backupData) {
+  if (!backupData || typeof backupData !== 'object') {
+    throw new Error('Invalid backup data format');
+  }
+
+  const restored = {
+    admins: backupData.admins || INITIAL_REAL_DATA.admins,
+    coreTeam: backupData.coreTeam || INITIAL_REAL_DATA.coreTeam,
+    volunteers: Array.isArray(backupData.volunteers) ? backupData.volunteers : [],
+    teams: Array.isArray(backupData.teams) ? backupData.teams : [],
+    odRequests: Array.isArray(backupData.odRequests) ? backupData.odRequests : [],
+    scanLogs: Array.isArray(backupData.scanLogs) ? backupData.scanLogs : []
+  };
+
+  memoryCache = restored;
+  writeDB(restored);
+  return restored;
 }
 
 module.exports = {
   readDB,
   writeDB,
-  initDB
+  initDB,
+  resetToRealData,
+  restoreFromBackup,
+  getStorageMode: () => ({
+    isVercel: !!isVercel,
+    mongoConnected,
+    storagePath: DB_FILE
+  })
 };

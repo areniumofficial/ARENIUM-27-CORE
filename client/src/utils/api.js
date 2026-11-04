@@ -37,3 +37,7 @@ export function getExcelExportUrl(params = {}) {
   const query = new URLSearchParams(params).toString();
   return `${API_BASE}/admin/export-excel?${query}`;
 }
+
+export function getBackupExportUrl() {
+  return `${API_BASE}/admin/export-backup`;
+}
