@@ -22,7 +22,7 @@ app.use((req, res, next) => {
 
 // Health check endpoints for Vercel and service monitoring
 app.get(['/', '/health', '/api/health'], (req, res) => {
-  res.json({ status: 'ok', service: 'ARENIUM 27 CORE API', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', service: 'ARENIUM API', timestamp: new Date().toISOString() });
 });
 
 // Helper for generating IDs
@@ -836,7 +836,7 @@ app.get('/api/admin/export-excel', (req, res) => {
   const excelBuffer = generateODExcel(records, metadata);
 
   const cleanDateStr = date && date !== 'ALL' ? date : new Date().toISOString().split('T')[0];
-  const filename = `ARENIUM27_OD_REPORT_${cleanDateStr}.xlsx`;
+  const filename = `ARENIUM_OD_REPORT_${cleanDateStr}.xlsx`;
 
   res.setHeader(
     'Content-Type',
@@ -852,7 +852,7 @@ app.get('/api/admin/export-excel', (req, res) => {
 app.get('/api/admin/export-backup', (req, res) => {
   const db = readDB();
   const dateStr = new Date().toISOString().split('T')[0];
-  const filename = `ARENIUM27_FULL_BACKUP_${dateStr}.json`;
+  const filename = `ARENIUM_FULL_BACKUP_${dateStr}.json`;
 
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

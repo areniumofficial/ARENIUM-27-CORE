@@ -79,7 +79,8 @@ export default function App() {
       <footer className="border-t border-slate-200/80 bg-white/80 backdrop-blur-xs py-4 px-6 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="font-black text-slate-900">ARENIUM 27</span>
+            <img src="/logo.png" alt="ARENIUM" className="w-5 h-5 rounded-md object-contain bg-slate-900 p-0.5" />
+            <span className="font-black text-slate-900">ARENIUM</span>
             <span>• Presidency University Tech Fest Attendance & OD Engine</span>
           </div>
           <div className="flex items-center gap-2 text-[11px] text-slate-400 font-medium">

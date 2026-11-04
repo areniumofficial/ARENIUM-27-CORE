@@ -1061,7 +1061,7 @@ export default function AdminPortal({ currentUser }) {
                 Excel Sheet Preview ({getFilteredExcelRecords().length} Records matching filters):
               </span>
               <span className="text-[11px] text-slate-500 font-mono">
-                ARENIUM27_OD_REPORT_{exportDate}.xlsx
+                ARENIUM_OD_REPORT_{exportDate}.xlsx
               </span>
             </div>
 
@@ -1172,7 +1172,7 @@ export default function AdminPortal({ currentUser }) {
                   Restore Database from JSON Snapshot
                 </h3>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Upload a previously downloaded <code className="bg-emerald-100/70 px-1 py-0.5 rounded font-mono text-[11px]">ARENIUM27_FULL_BACKUP_*.json</code> file to restore all student data, teams, and records without server restart.
+                  Upload a previously downloaded <code className="bg-emerald-100/70 px-1 py-0.5 rounded font-mono text-[11px]">ARENIUM_FULL_BACKUP_*.json</code> file to restore all student data, teams, and records without server restart.
                 </p>
               </div>
 

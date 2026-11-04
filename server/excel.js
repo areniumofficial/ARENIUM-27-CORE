@@ -55,7 +55,7 @@ function generateODExcel(records, metadata = {}) {
 
   // Also include a summary metadata sheet
   const summaryRows = [
-    { 'Parameter': 'Event Name', 'Value': 'ARENIUM 27 CORE - University Tech Festival' },
+    { 'Parameter': 'Event Name', 'Value': 'ARENIUM - University Tech Festival' },
     { 'Parameter': 'Report Type', 'Value': reportType },
     { 'Parameter': 'Date Filter', 'Value': date },
     { 'Parameter': 'Hours Filter', 'Value': filterHours },

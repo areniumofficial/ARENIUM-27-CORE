@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, Users, UserCheck, Award, LogOut, Zap, Smartphone } from 'lucide-react';
+import { Shield, Users, UserCheck, Award, LogOut, Smartphone } from 'lucide-react';
 import PhoneConnectModal from './PhoneConnectModal';
 
 export default function Navbar({ currentUser, onLogout, serverOnline }) {
@@ -48,17 +48,19 @@ export default function Navbar({ currentUser, onLogout, serverOnline }) {
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-15 sm:h-17 flex items-center justify-between">
           
           {/* Brand */}
-          <div className="flex items-center gap-2.5">
-            <div className="relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-[#30AFFF] via-[#92EEFF] to-[#D8FFC5] shadow-xs shadow-[#30AFFF]/20 border border-white shrink-0">
-              <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-slate-900 fill-white" />
-            </div>
+          <div className="flex items-center gap-3">
+            <img
+              src="/logo.png"
+              alt="ARENIUM"
+              className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl object-contain shadow-sm shrink-0 bg-slate-900 p-0.5"
+            />
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="text-lg sm:text-xl font-black tracking-tight text-slate-900">
-                  ARENIUM <span className="text-[#30AFFF]">27</span>
+                  ARENIUM
                 </span>
                 <span className="text-[9px] sm:text-[10px] font-extrabold tracking-widest uppercase bg-[#30AFFF]/15 text-[#006dae] px-1.5 py-0.5 rounded-md border border-[#30AFFF]/30">
-                  CORE
+                  PORTAL
                 </span>
               </div>
               <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium line-clamp-1">

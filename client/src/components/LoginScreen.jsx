@@ -52,18 +52,25 @@ export default function LoginScreen({ onLoginSuccess }) {
         
         {/* Light Header Ribbon */}
         <div className="p-6 sm:p-8 bg-gradient-to-r from-[#92EEFF]/30 via-white to-[#D8FFC5]/30 border-b border-slate-200/80">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-[#30AFFF]/15 text-[#006dae] border border-[#30AFFF]/30 mb-2">
-                <Sparkles className="w-3.5 h-3.5 text-[#30AFFF]" />
-                Event Portal Sign In
-              </span>
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
-                ARENIUM 27 UNIFIED PORTAL
-              </h1>
-              <p className="text-sm font-medium text-slate-600 mt-1">
-                Select your role to access Attendance, QR Verification, Leave Approvals & Daily Reports
-              </p>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <img
+                src="/logo.png"
+                alt="ARENIUM"
+                className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-contain shadow-md shrink-0 bg-slate-900 p-1"
+              />
+              <div>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-[#30AFFF]/15 text-[#006dae] border border-[#30AFFF]/30 mb-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-[#30AFFF]" />
+                  Event Portal Sign In
+                </span>
+                <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+                  ARENIUM
+                </h1>
+                <p className="text-xs sm:text-sm font-medium text-slate-600 mt-0.5">
+                  Event Operations, QR Attendance, Leave Approvals & Daily Reports
+                </p>
+              </div>
             </div>
             <div className="hidden sm:flex flex-col items-end">
               <span className="text-xs font-bold text-slate-800">Presidency University</span>
@@ -343,7 +350,7 @@ export default function LoginScreen({ onLoginSuccess }) {
         {/* Footer info */}
         <div className="px-8 py-3.5 bg-slate-50 border-t border-slate-200/80 text-center">
           <p className="text-xs text-slate-500 font-medium">
-            ARENIUM 27 • Presidency University Tech Festival • Production Launch Ready
+            ARENIUM • Presidency University Tech Festival • Production Launch Ready
           </p>
         </div>
 
