@@ -12,6 +12,19 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+// API route compatibility: handles requests whether proxy preserves or strips /api
+app.use((req, res, next) => {
+  if (!req.url.startsWith('/api') && req.url !== '/' && !req.url.startsWith('/health')) {
+    req.url = '/api' + req.url;
+  }
+  next();
+});
+
+// Health check endpoints for Vercel and service monitoring
+app.get(['/', '/health', '/api/health'], (req, res) => {
+  res.json({ status: 'ok', service: 'ARENIUM 27 CORE API', timestamp: new Date().toISOString() });
+});
+
 // Helper for generating IDs
 const generateId = (prefix) => `${prefix}-${crypto.randomBytes(4).toString('hex')}`;
 

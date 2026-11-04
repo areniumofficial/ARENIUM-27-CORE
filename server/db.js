@@ -144,6 +144,15 @@ function initDB() {
   initMongoDB();
 
   if (!fs.existsSync(DB_FILE)) {
+    const seedFile = path.join(__dirname, 'data', 'db.json');
+    if (fs.existsSync(seedFile)) {
+      try {
+        const seedData = fs.readFileSync(seedFile, 'utf-8');
+        fs.writeFileSync(DB_FILE, seedData, 'utf-8');
+        memoryCache = JSON.parse(seedData);
+        return memoryCache;
+      } catch (_) {}
+    }
     fs.writeFileSync(DB_FILE, JSON.stringify(INITIAL_REAL_DATA, null, 2), 'utf-8');
     memoryCache = JSON.parse(JSON.stringify(INITIAL_REAL_DATA));
   } else if (!memoryCache) {
