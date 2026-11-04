@@ -1,0 +1,25 @@
+{
+  "name": "arenium-27-core",
+  "version": "1.0.0",
+  "description": "ARENIUM 27 CORE - University Tech Festival Management & OD Attendance System",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "concurrently -k -n \"SERVER,CLIENT\" -c \"cyan,magenta\" \"npm run server\" \"npm run client\"",
+    "dev": "concurrently -k -n \"SERVER,CLIENT\" -c \"cyan,magenta\" \"npm run server\" \"npm run client\"",
+    "server": "node server/server.js",
+    "client": "npm --prefix client run dev",
+    "build": "npm --prefix client run build"
+  },
+  "keywords": [
+    "arenium",
+    "od-system",
+    "qr-attendance",
+    "excel-export",
+    "college-fest"
+  ],
+  "author": "ARENIUM 27 Core Team",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
