@@ -131,3 +131,4 @@ This concurrently starts:
 ## 📱 Optical QR Scanning & Camera Fallbacks
 The system includes an optical camera scanner powered by `html5-qrcode`. For development, testing, or desktop computers without webcams, each scanner also features an **Instant 1-Click Mock Preset** and a manual roll number/JSON input bar so you can test team validation and participant attendance in one click!
 "# ARENIUM-27-CORE" 
+"# ARENIUM-27-CORE" 
