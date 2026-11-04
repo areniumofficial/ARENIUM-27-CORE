@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Shield, Users, UserCheck, Award, LogOut, Zap, Smartphone, Sparkles } from 'lucide-react';
+import { Shield, Users, UserCheck, Award, LogOut, Zap, Smartphone } from 'lucide-react';
 import PhoneConnectModal from './PhoneConnectModal';
 
-export default function Navbar({ currentUser, onLogout, onQuickSwitch, serverOnline }) {
+export default function Navbar({ currentUser, onLogout, serverOnline }) {
   const [phoneModalOpen, setPhoneModalOpen] = useState(false);
 
   const getRoleBadge = (role) => {
@@ -40,64 +40,10 @@ export default function Navbar({ currentUser, onLogout, onQuickSwitch, serverOnl
     }
   };
 
-  // REAL OFFICIAL ACCOUNTS ONLY
-  const QUICK_PERSONAS = [
-    { label: 'Admin (Prof. Keren)', role: 'ADMIN', email: 'kerenlois@presidencyuniversity.in', pass: 'Kerensois27' },
-    { label: 'Admin (Abhyas)', role: 'ADMIN', email: 'Kathuriaabhyas0@gmail.com', pass: 'Abhyas2108' },
-    { label: 'Core (Kaushal)', role: 'CORE_TEAM', email: 'singhkaushal.2507@gmail.com', pass: 'Kaush2507' },
-    { label: 'Core (Abhyas)', role: 'CORE_TEAM', email: 'Kathuriaabhyas@gmail.com', pass: 'Abhyas2108' },
-    { label: 'Core (Ashlin)', role: 'CORE_TEAM', email: 'ashlinsiddharth1@gmail.com', pass: 'Ashlin01' },
-    { label: 'Core (Vimal)', role: 'CORE_TEAM', email: 'vimalrajsnkk@gmail.com', pass: 'Vimal69' }
-  ];
-
   return (
     <>
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
         
-        {/* Top Official Quick-Account Bar */}
-        <div className="bg-gradient-to-r from-[#92EEFF]/15 via-[#FBFBFB] to-[#D8FFC5]/20 border-b border-slate-200/60 px-3 sm:px-4 py-1.5 overflow-x-auto no-scrollbar touch-pan-x">
-          <div className="max-w-7xl mx-auto flex items-center justify-between gap-2.5 text-[11px]">
-            <div className="flex items-center gap-1.5 shrink-0">
-              <span className="flex items-center gap-1 font-bold text-slate-700 uppercase tracking-wider text-[10px] bg-white px-2 py-0.5 rounded-full border border-slate-200 shadow-2xs">
-                <Sparkles className="w-3 h-3 text-[#30AFFF]" />
-                Official Team:
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1.5 shrink-0 overflow-x-auto py-0.5">
-              {QUICK_PERSONAS.map((p, idx) => {
-                const isActive = currentUser && currentUser.email === p.email;
-
-                return (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => onQuickSwitch(p)}
-                    className={`px-2.5 py-1 rounded-full font-semibold transition-all border text-[11px] whitespace-nowrap active:scale-95 ${
-                      isActive
-                        ? 'bg-[#30AFFF] text-white border-[#30AFFF] shadow-xs'
-                        : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200'
-                    }`}
-                  >
-                    {p.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Mobile / Tablet QR Link button */}
-            <button
-              onClick={() => setPhoneModalOpen(true)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#92EEFF]/30 hover:bg-[#92EEFF]/50 text-sky-950 font-bold border border-[#92EEFF]/60 text-[10px] uppercase tracking-wider shrink-0 transition-colors shadow-2xs"
-              title="Show QR Code to open on phone/tablet"
-            >
-              <Smartphone className="w-3 h-3 text-[#006dae]" />
-              <span className="hidden sm:inline">Phone/Tablet Link</span>
-              <span className="sm:hidden">📱 Phone</span>
-            </button>
-          </div>
-        </div>
-
         {/* Main Navbar */}
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-15 sm:h-17 flex items-center justify-between">
           

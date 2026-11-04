@@ -10,32 +10,12 @@ export default function LoginScreen({ onLoginSuccess }) {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // REAL AUTHENTICATED CREDENTIALS ONLY
-  const CORE_ACCOUNTS = [
-    { email: 'singhkaushal.2507@gmail.com', pass: 'Kaush2507', name: 'Kaushal Singh' },
-    { email: 'Kathuriaabhyas@gmail.com', pass: 'Abhyas2108', name: 'Abhyas Kathuria' },
-    { email: 'ashlinsiddharth1@gmail.com', pass: 'Ashlin01', name: 'Ashlin Siddharth' },
-    { email: 'vimalrajsnkk@gmail.com', pass: 'Vimal69', name: 'Vimal Raj' }
-  ];
-
-  const ADMIN_ACCOUNTS = [
-    { email: 'kerenlois@presidencyuniversity.in', pass: 'Kerensois27', name: 'Prof. Keren Lois' },
-    { email: 'Kathuriaabhyas0@gmail.com', pass: 'Abhyas2108', name: 'Abhyas Kathuria' }
-  ];
-
   const handleRoleChange = (role) => {
     setSelectedRole(role);
     setErrorMessage('');
-    if (role === 'CORE_TEAM') {
-      setEmail(CORE_ACCOUNTS[0].email);
-      setPassword(CORE_ACCOUNTS[0].pass);
-    } else if (role === 'ADMIN') {
-      setEmail(ADMIN_ACCOUNTS[0].email);
-      setPassword(ADMIN_ACCOUNTS[0].pass);
-    } else {
-      setEmail('');
-      setPassword('');
-    }
+    setEmail('');
+    setPassword('');
+    setTeamName('');
   };
 
   const handleSubmit = async (e) => {
@@ -64,12 +44,6 @@ export default function LoginScreen({ onLoginSuccess }) {
     } finally {
       setLoading(false);
     }
-  };
-
-  const pickPreset = (presetEmail, presetPass) => {
-    setEmail(presetEmail);
-    setPassword(presetPass);
-    setErrorMessage('');
   };
 
   return (
@@ -209,30 +183,6 @@ export default function LoginScreen({ onLoginSuccess }) {
                   </p>
                 </div>
 
-                {/* Quick Presets for Core Team */}
-                <div>
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">
-                    Official Core Team Accounts:
-                  </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {CORE_ACCOUNTS.map((acc) => (
-                      <button
-                        key={acc.email}
-                        type="button"
-                        onClick={() => pickPreset(acc.email, acc.pass)}
-                        className={`p-3 rounded-xl text-left border transition-all ${
-                          email === acc.email
-                            ? 'bg-[#30AFFF]/10 border-[#30AFFF] text-slate-900 shadow-xs ring-1 ring-[#30AFFF]'
-                            : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
-                        }`}
-                      >
-                        <div className="text-xs font-bold text-slate-900">{acc.name}</div>
-                        <div className="text-[11px] text-slate-500 truncate">{acc.email}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
                     Email Address
@@ -243,7 +193,7 @@ export default function LoginScreen({ onLoginSuccess }) {
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="singhkaushal.2507@gmail.com"
+                      placeholder="Enter your registered core email"
                       required
                       className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#30AFFF] text-sm text-slate-900 bg-white"
                     />
@@ -334,30 +284,6 @@ export default function LoginScreen({ onLoginSuccess }) {
                   </p>
                 </div>
 
-                {/* Quick Presets for Admin */}
-                <div>
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">
-                    Official Admin Accounts:
-                  </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {ADMIN_ACCOUNTS.map((acc) => (
-                      <button
-                        key={acc.email}
-                        type="button"
-                        onClick={() => pickPreset(acc.email, acc.pass)}
-                        className={`p-3 rounded-xl text-left border transition-all ${
-                          email === acc.email
-                            ? 'bg-rose-50 border-rose-300 text-rose-950 shadow-xs ring-1 ring-rose-300'
-                            : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
-                        }`}
-                      >
-                        <div className="text-xs font-bold text-slate-900">{acc.name}</div>
-                        <div className="text-[11px] text-slate-500 truncate">{acc.email}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
                     Admin Email
@@ -368,7 +294,7 @@ export default function LoginScreen({ onLoginSuccess }) {
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="kerenlois@presidencyuniversity.in"
+                      placeholder="Enter your admin email"
                       required
                       className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#30AFFF] text-sm text-slate-900 bg-white"
                     />

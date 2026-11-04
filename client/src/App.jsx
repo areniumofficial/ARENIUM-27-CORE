@@ -41,34 +41,12 @@ export default function App() {
     localStorage.removeItem('arenium_user');
   };
 
-  // Instant 1-click persona switch from top demo bar
-  const handleQuickSwitch = async (persona) => {
-    try {
-      const payload = {
-        role: persona.role,
-        email: persona.email,
-        password: persona.pass,
-        teamName: persona.teamName
-      };
-      const res = await apiFetch('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
-      if (res.success && res.user) {
-        handleLoginSuccess(res.user);
-      }
-    } catch (err) {
-      console.error('Quick switch failed:', err);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-[#FBFBFB] text-slate-800 flex flex-col font-sans selection:bg-[#92EEFF] selection:text-slate-900">
-      {/* Top Brand Navigation with Demo Quick Switcher */}
+      {/* Top Brand Navigation */}
       <Navbar
         currentUser={currentUser}
         onLogout={handleLogout}
-        onQuickSwitch={handleQuickSwitch}
         serverOnline={serverOnline}
       />
 
