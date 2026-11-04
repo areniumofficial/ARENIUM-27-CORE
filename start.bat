@@ -25,7 +25,7 @@ echo.
 
 :: 2. Free ports 5000 and 5173 if previously occupied
 echo [2/4] Checking ports 5000 and 5173...
-powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 5000,5173 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }" >nul 2>nul
+powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 5000,5173 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess | Stop-Process -Force -ErrorAction SilentlyContinue" >nul 2>nul
 echo [OK] Ports 5000 and 5173 verified.
 echo.
 
@@ -51,9 +51,9 @@ echo [OK] All dependencies ready.
 echo.
 
 :: 4. Launch fullstack app and open browser
-echo [4/4] Starting Server and Client...
-echo       - Server: http://localhost:5000
-echo       - Client: http://localhost:5173
+echo [4/4] Starting Server and Client (PC, Phones and Tablets)...
+echo       - PC Local:       http://localhost:5173
+echo       - Phone and Tablet: http://192.168.193.183:5173
 echo.
 echo Launching your browser in 2 seconds...
 start "" powershell -NoProfile -Command "Start-Sleep -Seconds 2; Start-Process 'http://localhost:5173'"

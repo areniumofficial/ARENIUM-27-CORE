@@ -840,6 +840,6 @@ app.post('/api/system/reset-demo', (req, res) => {
   res.json({ success: true, message: 'Database reset to initial demo state' });
 });
 
-app.listen(PORT, () => {
-  console.log(`[ARENIUM 27 CORE] Server running on http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`[ARENIUM 27 CORE] Server running on port ${PORT} (All network interfaces)`);
 });

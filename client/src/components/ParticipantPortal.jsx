@@ -547,7 +547,7 @@ export default function ParticipantPortal({ currentUser }) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {TIMETABLE_HOURS.map(({ hr, label, time }) => {
                     const isSelected = selectedHours.includes(hr);
                     return (
