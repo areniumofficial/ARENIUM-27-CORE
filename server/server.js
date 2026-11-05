@@ -1,10 +1,11 @@
 const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
-const { readDB, writeDB, initDB, resetToRealData, restoreFromBackup, getStorageMode } = require('./db');
+const { connectDB, readDB, writeDB, initDB, resetToRealData, restoreFromBackup, getStorageMode } = require('./db');
 const { generateODExcel } = require('./excel');
 
-initDB();
+// Eager initialization of DB connection
+initDB().catch(err => console.warn('[ARENIUM API] Startup DB init note:', err.message));
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -22,7 +23,13 @@ app.use((req, res, next) => {
 
 // Health check endpoints for Vercel and service monitoring
 app.get(['/', '/health', '/api/health'], (req, res) => {
-  res.json({ status: 'ok', service: 'ARENIUM API', timestamp: new Date().toISOString() });
+  const storage = getStorageMode();
+  res.json({
+    status: 'ok',
+    service: 'ARENIUM API',
+    timestamp: new Date().toISOString(),
+    storage
+  });
 });
 
 // Helper for generating IDs
@@ -38,9 +45,9 @@ const formatHours = (hoursArray) => {
 // AUTHENTICATION ROUTES
 // ==========================================
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   const { role, email, password, teamName } = req.body;
-  const db = readDB();
+  const db = await readDB();
 
   if (role === 'ADMIN') {
     const admin = db.admins.find(
@@ -88,7 +95,7 @@ app.post('/api/auth/login', (req, res) => {
   }
 
   if (role === 'VOLUNTEER') {
-    const vol = db.volunteers.find(
+    const vol = (db.volunteers || []).find(
       v => v.email.toLowerCase() === (email || '').toLowerCase().trim() &&
            v.password === (password || '').trim()
     );
@@ -124,11 +131,11 @@ app.post('/api/auth/login', (req, res) => {
       return res.status(400).json({ error: 'Team name is required for Participants' });
     }
 
-    let team = db.teams.find(
+    let team = (db.teams || []).find(
       t => t.teamName.toLowerCase() === cleanTeamName.toLowerCase()
     );
 
-    // If team doesn't exist, auto-create a starting team with 1 leader so participants can jump in
+    // If team doesn't exist, auto-create a starting team with 1 leader
     if (!team) {
       team = {
         id: generateId('team'),
@@ -150,8 +157,9 @@ app.post('/api/auth/login', (req, res) => {
           }
         ]
       };
+      if (!Array.isArray(db.teams)) db.teams = [];
       db.teams.push(team);
-      writeDB(db);
+      await writeDB(db);
     }
 
     return res.json({
@@ -170,17 +178,18 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 // Quick seed status route
-app.get('/api/system/status', (req, res) => {
-  const db = readDB();
+app.get('/api/system/status', async (req, res) => {
+  const db = await readDB();
   res.json({
     status: 'online',
     counts: {
-      admins: db.admins.length,
-      coreTeam: db.coreTeam.length,
-      volunteers: db.volunteers.length,
-      teams: db.teams.length,
-      odRequests: db.odRequests.length
-    }
+      admins: (db.admins || []).length,
+      coreTeam: (db.coreTeam || []).length,
+      volunteers: (db.volunteers || []).length,
+      teams: (db.teams || []).length,
+      odRequests: (db.odRequests || []).length
+    },
+    storage: getStorageMode()
   });
 });
 
@@ -189,7 +198,7 @@ app.get('/api/system/status', (req, res) => {
 // ==========================================
 
 // Add a volunteer (submits to admin for approval)
-app.post('/api/core/add-volunteer', (req, res) => {
+app.post('/api/core/add-volunteer', async (req, res) => {
   const {
     name,
     email,
@@ -208,7 +217,9 @@ app.post('/api/core/add-volunteer', (req, res) => {
     return res.status(400).json({ error: 'Name, email, and roll number are required' });
   }
 
-  const db = readDB();
+  const db = await readDB();
+  if (!Array.isArray(db.volunteers)) db.volunteers = [];
+
   const existing = db.volunteers.find(v => v.email.toLowerCase() === email.toLowerCase());
   if (existing) {
     return res.status(400).json({ error: 'A volunteer with this email already exists' });
@@ -234,23 +245,23 @@ app.post('/api/core/add-volunteer', (req, res) => {
   };
 
   db.volunteers.unshift(newVolunteer);
-  writeDB(db);
+  await writeDB(db);
 
   res.json({
     success: true,
-    message: 'Volunteer added and submitted to Admin for approval',
+    message: 'Volunteer registered and submitted to Admin for approval',
     volunteer: newVolunteer
   });
 });
 
 // List volunteers added by core
-app.get('/api/core/volunteers', (req, res) => {
-  const db = readDB();
-  res.json(db.volunteers);
+app.get('/api/core/volunteers', async (req, res) => {
+  const db = await readDB();
+  res.json(db.volunteers || []);
 });
 
 // Apply for OD leave for Hours 1-8
-app.post('/api/core/apply-od', (req, res) => {
+app.post('/api/core/apply-od', async (req, res) => {
   const {
     coreId,
     name,
@@ -271,7 +282,9 @@ app.post('/api/core/apply-od', (req, res) => {
     return res.status(400).json({ error: 'Date is required' });
   }
 
-  const db = readDB();
+  const db = await readDB();
+  if (!Array.isArray(db.odRequests)) db.odRequests = [];
+
   const newRequest = {
     id: generateId('od-core'),
     requestType: 'CORE_TEAM',
@@ -286,7 +299,7 @@ app.post('/api/core/apply-od', (req, res) => {
     date: date,
     hours: hours.sort((a, b) => a - b),
     hoursFormatted: formatHours(hours),
-    reason: reason || 'Core Organization & Stage Logistics Duty',
+    reason: reason || 'Core Management, Tech Arena Setup and Event Coordination',
     submittedBy: {
       id: coreId,
       name: name,
@@ -300,7 +313,7 @@ app.post('/api/core/apply-od', (req, res) => {
   };
 
   db.odRequests.unshift(newRequest);
-  writeDB(db);
+  await writeDB(db);
 
   res.json({
     success: true,
@@ -309,14 +322,17 @@ app.post('/api/core/apply-od', (req, res) => {
   });
 });
 
-// Get Core OD requests
-app.get('/api/core/od-history', (req, res) => {
-  const { coreId } = req.query;
-  const db = readDB();
-  const requests = coreId
-    ? db.odRequests.filter(r => r.requestType === 'CORE_TEAM' && r.targetId === coreId)
-    : db.odRequests.filter(r => r.requestType === 'CORE_TEAM');
-  res.json(requests);
+// Get Core OD requests (supports both view=ALL for full team visibility and view=MY for personal filter)
+app.get('/api/core/od-history', async (req, res) => {
+  const { coreId, view } = req.query;
+  const db = await readDB();
+  const allCoreRequests = (db.odRequests || []).filter(r => r.requestType === 'CORE_TEAM');
+
+  if (view === 'MY' && coreId) {
+    return res.json(allCoreRequests.filter(r => r.targetId === coreId));
+  }
+  // Default returns all core team requests so all core members have mutual visibility
+  res.json(allCoreRequests);
 });
 
 // ==========================================
@@ -324,9 +340,11 @@ app.get('/api/core/od-history', (req, res) => {
 // ==========================================
 
 // Verify Team via Team QR
-app.post('/api/volunteer/verify-team', (req, res) => {
+app.post('/api/volunteer/verify-team', async (req, res) => {
   const { teamId, teamName, volunteerId, volunteerName } = req.body;
-  const db = readDB();
+  const db = await readDB();
+  if (!Array.isArray(db.teams)) db.teams = [];
+  if (!Array.isArray(db.scanLogs)) db.scanLogs = [];
 
   let team = db.teams.find(t => 
     (teamId && t.id === teamId) || 
@@ -350,11 +368,11 @@ app.post('/api/volunteer/verify-team', (req, res) => {
     teamId: team.id,
     teamName: team.teamName,
     timestamp: new Date().toISOString(),
-    details: `Verified ${team.members.length} members of ${team.teamName}`
+    details: `Verified ${team.members ? team.members.length : 0} members of ${team.teamName}`
   };
   db.scanLogs.unshift(scanLog);
 
-  writeDB(db);
+  await writeDB(db);
 
   res.json({
     success: true,
@@ -364,7 +382,7 @@ app.post('/api/volunteer/verify-team', (req, res) => {
 });
 
 // Submit participant hourly attendance (allotted by volunteer after QR scan)
-app.post('/api/volunteer/submit-attendance', (req, res) => {
+app.post('/api/volunteer/submit-attendance', async (req, res) => {
   const {
     participantId,
     name,
@@ -388,7 +406,10 @@ app.post('/api/volunteer/submit-attendance', (req, res) => {
     return res.status(400).json({ error: 'Please select attendance hours (Hour 1 to 8)' });
   }
 
-  const db = readDB();
+  const db = await readDB();
+  if (!Array.isArray(db.odRequests)) db.odRequests = [];
+  if (!Array.isArray(db.scanLogs)) db.scanLogs = [];
+
   const newAttendance = {
     id: generateId('od-vol'),
     requestType: 'VOLUNTEER',
@@ -431,7 +452,7 @@ app.post('/api/volunteer/submit-attendance', (req, res) => {
     details: `Logged ${hours.length} hours attendance for ${name} (${rollNumber})`
   });
 
-  writeDB(db);
+  await writeDB(db);
 
   res.json({
     success: true,
@@ -441,15 +462,18 @@ app.post('/api/volunteer/submit-attendance', (req, res) => {
 });
 
 // Get volunteer scan history and recent submissions
-app.get('/api/volunteer/activity', (req, res) => {
+app.get('/api/volunteer/activity', async (req, res) => {
   const { volunteerId } = req.query;
-  const db = readDB();
+  const db = await readDB();
+  const scanLogs = db.scanLogs || [];
+  const odRequests = db.odRequests || [];
+
   const scans = volunteerId 
-    ? db.scanLogs.filter(s => s.volunteerId === volunteerId)
-    : db.scanLogs;
+    ? scanLogs.filter(s => s.volunteerId === volunteerId)
+    : scanLogs;
   const submissions = volunteerId
-    ? db.odRequests.filter(r => r.submittedBy && r.submittedBy.id === volunteerId)
-    : db.odRequests.filter(r => r.requestType === 'VOLUNTEER');
+    ? odRequests.filter(r => r.submittedBy && r.submittedBy.id === volunteerId)
+    : odRequests.filter(r => r.requestType === 'VOLUNTEER');
 
   res.json({
     scans,
@@ -458,20 +482,21 @@ app.get('/api/volunteer/activity', (req, res) => {
 });
 
 // Search participant or team for quick scan fallback
-app.get('/api/volunteer/lookup', (req, res) => {
+app.get('/api/volunteer/lookup', async (req, res) => {
   const { q } = req.query;
   if (!q) return res.json({ teams: [], members: [] });
 
-  const db = readDB();
+  const db = await readDB();
   const query = q.toLowerCase().trim();
+  const teams = db.teams || [];
 
-  const matchingTeams = db.teams.filter(t => 
+  const matchingTeams = teams.filter(t => 
     t.teamName.toLowerCase().includes(query)
   );
 
   const matchingMembers = [];
-  db.teams.forEach(t => {
-    t.members.forEach(m => {
+  teams.forEach(t => {
+    (t.members || []).forEach(m => {
       if (
         m.name.toLowerCase().includes(query) ||
         m.rollNumber.toLowerCase().includes(query)
@@ -496,9 +521,10 @@ app.get('/api/volunteer/lookup', (req, res) => {
 // ==========================================
 
 // Get Team info by teamName
-app.get('/api/participant/team/:teamName', (req, res) => {
-  const db = readDB();
-  const team = db.teams.find(
+app.get('/api/participant/team/:teamName', async (req, res) => {
+  const db = await readDB();
+  const teams = db.teams || [];
+  const team = teams.find(
     t => t.teamName.toLowerCase() === req.params.teamName.toLowerCase().trim()
   );
   if (!team) {
@@ -508,17 +534,20 @@ app.get('/api/participant/team/:teamName', (req, res) => {
 });
 
 // Add member to team
-app.post('/api/participant/add-member', (req, res) => {
+app.post('/api/participant/add-member', async (req, res) => {
   const { teamName, name, rollNumber, section, batchNumber, schoolName, hodName } = req.body;
   if (!teamName || !name || !rollNumber) {
     return res.status(400).json({ error: 'Team name, member name, and roll number are required' });
   }
 
-  const db = readDB();
+  const db = await readDB();
+  if (!Array.isArray(db.teams)) db.teams = [];
   const team = db.teams.find(t => t.teamName.toLowerCase() === teamName.toLowerCase().trim());
   if (!team) {
     return res.status(404).json({ error: 'Team not found' });
   }
+
+  if (!Array.isArray(team.members)) team.members = [];
 
   const newMember = {
     id: generateId('mem'),
@@ -532,7 +561,7 @@ app.post('/api/participant/add-member', (req, res) => {
   };
 
   team.members.push(newMember);
-  writeDB(db);
+  await writeDB(db);
 
   res.json({
     success: true,
@@ -542,7 +571,7 @@ app.post('/api/participant/add-member', (req, res) => {
 });
 
 // Participant self apply for OD
-app.post('/api/participant/apply-od', (req, res) => {
+app.post('/api/participant/apply-od', async (req, res) => {
   const {
     memberId,
     name,
@@ -564,7 +593,9 @@ app.post('/api/participant/apply-od', (req, res) => {
     return res.status(400).json({ error: 'Date is required' });
   }
 
-  const db = readDB();
+  const db = await readDB();
+  if (!Array.isArray(db.odRequests)) db.odRequests = [];
+
   const newRequest = {
     id: generateId('od-part'),
     requestType: 'PARTICIPANT',
@@ -593,7 +624,7 @@ app.post('/api/participant/apply-od', (req, res) => {
   };
 
   db.odRequests.unshift(newRequest);
-  writeDB(db);
+  await writeDB(db);
 
   res.json({
     success: true,
@@ -603,10 +634,11 @@ app.post('/api/participant/apply-od', (req, res) => {
 });
 
 // Get team OD history
-app.get('/api/participant/od-history/:teamName', (req, res) => {
-  const db = readDB();
+app.get('/api/participant/od-history/:teamName', async (req, res) => {
+  const db = await readDB();
   const teamName = req.params.teamName.toLowerCase().trim();
-  const requests = db.odRequests.filter(
+  const odRequests = db.odRequests || [];
+  const requests = odRequests.filter(
     r => (r.teamName && r.teamName.toLowerCase() === teamName) ||
          (r.requestType === 'PARTICIPANT' && r.teamName && r.teamName.toLowerCase() === teamName)
   );
@@ -618,18 +650,22 @@ app.get('/api/participant/od-history/:teamName', (req, res) => {
 // ==========================================
 
 // Overview stats
-app.get('/api/admin/overview', (req, res) => {
-  const db = readDB();
-  const totalCoreRequests = db.odRequests.filter(r => r.requestType === 'CORE_TEAM').length;
-  const totalVolunteerScans = db.odRequests.filter(r => r.requestType === 'VOLUNTEER').length;
-  const totalParticipantODs = db.odRequests.filter(r => r.requestType === 'PARTICIPANT').length;
+app.get('/api/admin/overview', async (req, res) => {
+  const db = await readDB();
+  const odRequests = db.odRequests || [];
+  const volunteers = db.volunteers || [];
+  const teams = db.teams || [];
 
-  const pendingCore = db.odRequests.filter(r => r.requestType === 'CORE_TEAM' && r.status === 'PENDING').length;
-  const pendingVolunteers = db.volunteers.filter(v => v.status === 'PENDING').length +
-                           db.odRequests.filter(r => r.requestType === 'VOLUNTEER' && r.status === 'PENDING').length;
-  const pendingParticipants = db.odRequests.filter(r => r.requestType === 'PARTICIPANT' && r.status === 'PENDING').length;
+  const totalCoreRequests = odRequests.filter(r => r.requestType === 'CORE_TEAM').length;
+  const totalVolunteerScans = odRequests.filter(r => r.requestType === 'VOLUNTEER').length;
+  const totalParticipantODs = odRequests.filter(r => r.requestType === 'PARTICIPANT').length;
 
-  const totalApproved = db.odRequests.filter(r => r.status === 'APPROVED').length;
+  const pendingCore = odRequests.filter(r => r.requestType === 'CORE_TEAM' && r.status === 'PENDING').length;
+  const pendingVolunteers = volunteers.filter(v => v.status === 'PENDING').length +
+                           odRequests.filter(r => r.requestType === 'VOLUNTEER' && r.status === 'PENDING').length;
+  const pendingParticipants = odRequests.filter(r => r.requestType === 'PARTICIPANT' && r.status === 'PENDING').length;
+
+  const totalApproved = odRequests.filter(r => r.status === 'APPROVED').length;
 
   res.json({
     totalCoreRequests,
@@ -639,10 +675,10 @@ app.get('/api/admin/overview', (req, res) => {
     pendingVolunteers,
     pendingParticipants,
     totalApproved,
-    totalTeams: db.teams.length,
-    verifiedTeams: db.teams.filter(t => t.verified).length,
-    totalVolunteers: db.volunteers.length,
-    approvedVolunteers: db.volunteers.filter(v => v.status === 'APPROVED').length,
+    totalTeams: teams.length,
+    verifiedTeams: teams.filter(t => t.verified).length,
+    totalVolunteers: volunteers.length,
+    approvedVolunteers: volunteers.filter(v => v.status === 'APPROVED').length,
     storageMode: getStorageMode()
   });
 });
@@ -651,34 +687,37 @@ app.get('/api/admin/overview', (req, res) => {
 // 1. CORE TEAM
 // 2. VOLUNTEERS (both volunteer accounts pending approval + attendance records pending approval)
 // 3. PARTICIPANTS
-app.get('/api/admin/requests', (req, res) => {
-  const db = readDB();
+app.get('/api/admin/requests', async (req, res) => {
+  const db = await readDB();
+  const odRequests = db.odRequests || [];
+  const volunteers = db.volunteers || [];
 
-  const coreRequests = db.odRequests.filter(r => r.requestType === 'CORE_TEAM');
-  const volunteerAttendanceRequests = db.odRequests.filter(r => r.requestType === 'VOLUNTEER');
-  const volunteerAccountRequests = db.volunteers.filter(v => v.status === 'PENDING');
-  const participantRequests = db.odRequests.filter(r => r.requestType === 'PARTICIPANT');
+  const coreRequests = odRequests.filter(r => r.requestType === 'CORE_TEAM');
+  const volunteerAttendanceRequests = odRequests.filter(r => r.requestType === 'VOLUNTEER');
+  const volunteerAccountRequests = volunteers.filter(v => v.status === 'PENDING');
+  const participantRequests = odRequests.filter(r => r.requestType === 'PARTICIPANT');
 
   res.json({
     coreRequests,
     volunteers: {
       accountApprovals: volunteerAccountRequests,
       attendanceApprovals: volunteerAttendanceRequests,
-      allVolunteers: db.volunteers
+      allVolunteers: volunteers
     },
     participantRequests
   });
 });
 
 // Review OD Request (Core, Volunteer attendance, Participant)
-app.post('/api/admin/review-od', (req, res) => {
+app.post('/api/admin/review-od', async (req, res) => {
   const { requestId, action, adminName, remark } = req.body;
   if (!['APPROVED', 'REJECTED'].includes(action)) {
     return res.status(400).json({ error: 'Action must be APPROVED or REJECTED' });
   }
 
-  const db = readDB();
-  const request = db.odRequests.find(r => r.id === requestId);
+  const db = await readDB();
+  const odRequests = db.odRequests || [];
+  const request = odRequests.find(r => r.id === requestId);
   if (!request) {
     return res.status(404).json({ error: 'Request not found' });
   }
@@ -688,7 +727,7 @@ app.post('/api/admin/review-od', (req, res) => {
   request.reviewedBy = adminName || 'Admin';
   request.reviewedAt = new Date().toISOString();
 
-  writeDB(db);
+  await writeDB(db);
 
   res.json({
     success: true,
@@ -698,7 +737,7 @@ app.post('/api/admin/review-od', (req, res) => {
 });
 
 // Batch Review OD Requests
-app.post('/api/admin/batch-review-od', (req, res) => {
+app.post('/api/admin/batch-review-od', async (req, res) => {
   const { requestIds, action, adminName, remark } = req.body;
   if (!['APPROVED', 'REJECTED'].includes(action)) {
     return res.status(400).json({ error: 'Action must be APPROVED or REJECTED' });
@@ -707,11 +746,12 @@ app.post('/api/admin/batch-review-od', (req, res) => {
     return res.status(400).json({ error: 'No request IDs provided' });
   }
 
-  const db = readDB();
+  const db = await readDB();
+  const odRequests = db.odRequests || [];
   let updatedCount = 0;
   const now = new Date().toISOString();
 
-  db.odRequests.forEach(r => {
+  odRequests.forEach(r => {
     if (requestIds.includes(r.id)) {
       r.status = action;
       r.adminRemark = remark || (action === 'APPROVED' ? 'Batch Approved by Admin' : 'Batch Rejected by Admin');
@@ -721,7 +761,7 @@ app.post('/api/admin/batch-review-od', (req, res) => {
     }
   });
 
-  writeDB(db);
+  await writeDB(db);
 
   res.json({
     success: true,
@@ -731,14 +771,15 @@ app.post('/api/admin/batch-review-od', (req, res) => {
 });
 
 // Review Volunteer Account Addition (submitted by Core)
-app.post('/api/admin/review-volunteer', (req, res) => {
+app.post('/api/admin/review-volunteer', async (req, res) => {
   const { volunteerId, action, adminName, remark } = req.body;
   if (!['APPROVED', 'REJECTED'].includes(action)) {
     return res.status(400).json({ error: 'Action must be APPROVED or REJECTED' });
   }
 
-  const db = readDB();
-  const vol = db.volunteers.find(v => v.id === volunteerId);
+  const db = await readDB();
+  const volunteers = db.volunteers || [];
+  const vol = volunteers.find(v => v.id === volunteerId);
   if (!vol) {
     return res.status(404).json({ error: 'Volunteer not found' });
   }
@@ -748,7 +789,7 @@ app.post('/api/admin/review-volunteer', (req, res) => {
   vol.approvedAt = new Date().toISOString();
   if (remark) vol.adminRemark = remark;
 
-  writeDB(db);
+  await writeDB(db);
 
   res.json({
     success: true,
@@ -758,7 +799,7 @@ app.post('/api/admin/review-volunteer', (req, res) => {
 });
 
 // Batch Review Volunteers
-app.post('/api/admin/batch-review-volunteers', (req, res) => {
+app.post('/api/admin/batch-review-volunteers', async (req, res) => {
   const { volunteerIds, action, adminName, remark } = req.body;
   if (!['APPROVED', 'REJECTED'].includes(action)) {
     return res.status(400).json({ error: 'Action must be APPROVED or REJECTED' });
@@ -767,11 +808,12 @@ app.post('/api/admin/batch-review-volunteers', (req, res) => {
     return res.status(400).json({ error: 'No volunteer IDs provided' });
   }
 
-  const db = readDB();
+  const db = await readDB();
+  const volunteers = db.volunteers || [];
   let updatedCount = 0;
   const now = new Date().toISOString();
 
-  db.volunteers.forEach(v => {
+  volunteers.forEach(v => {
     if (volunteerIds.includes(v.id)) {
       v.status = action;
       v.approvedBy = adminName || 'Admin';
@@ -781,7 +823,7 @@ app.post('/api/admin/batch-review-volunteers', (req, res) => {
     }
   });
 
-  writeDB(db);
+  await writeDB(db);
 
   res.json({
     success: true,
@@ -791,20 +833,20 @@ app.post('/api/admin/batch-review-volunteers', (req, res) => {
 });
 
 // List all teams and verification
-app.get('/api/admin/teams', (req, res) => {
-  const db = readDB();
-  res.json(db.teams);
+app.get('/api/admin/teams', async (req, res) => {
+  const db = await readDB();
+  res.json(db.teams || []);
 });
 
 // ==========================================
 // DAILY EXCEL EXPORT ROUTE
 // ==========================================
 
-app.get('/api/admin/export-excel', (req, res) => {
+app.get('/api/admin/export-excel', async (req, res) => {
   const { date, hour, sectionType, status = 'APPROVED' } = req.query;
-  const db = readDB();
+  const db = await readDB();
 
-  let records = db.odRequests;
+  let records = db.odRequests || [];
 
   // Filter by status (default APPROVED or ALL)
   if (status && status !== 'ALL') {
@@ -849,8 +891,8 @@ app.get('/api/admin/export-excel', (req, res) => {
 });
 
 // Download full system backup as JSON
-app.get('/api/admin/export-backup', (req, res) => {
-  const db = readDB();
+app.get('/api/admin/export-backup', async (req, res) => {
+  const db = await readDB();
   const dateStr = new Date().toISOString().split('T')[0];
   const filename = `ARENIUM_FULL_BACKUP_${dateStr}.json`;
 
@@ -860,21 +902,21 @@ app.get('/api/admin/export-backup', (req, res) => {
 });
 
 // Restore system from uploaded JSON backup
-app.post('/api/admin/restore-backup', (req, res) => {
+app.post('/api/admin/restore-backup', async (req, res) => {
   const { backupData } = req.body;
   if (!backupData) {
     return res.status(400).json({ error: 'No backup data provided' });
   }
 
   try {
-    const restored = restoreFromBackup(backupData);
+    const restored = await restoreFromBackup(backupData);
     res.json({
       success: true,
       message: 'System successfully restored from backup snapshot',
       counts: {
-        volunteers: restored.volunteers.length,
-        teams: restored.teams.length,
-        odRequests: restored.odRequests.length
+        volunteers: (restored.volunteers || []).length,
+        teams: (restored.teams || []).length,
+        odRequests: (restored.odRequests || []).length
       }
     });
   } catch (err) {
@@ -883,8 +925,8 @@ app.post('/api/admin/restore-backup', (req, res) => {
 });
 
 // Reset to clean real state (zero demo data)
-app.post('/api/system/reset-demo', (req, res) => {
-  const db = resetToRealData();
+app.post('/api/system/reset-demo', async (req, res) => {
+  const db = await resetToRealData();
   res.json({ success: true, message: 'Database reset to clean real state' });
 });
 
@@ -895,4 +937,3 @@ if (require.main === module) {
 }
 
 module.exports = app;
-

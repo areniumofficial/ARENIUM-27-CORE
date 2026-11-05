@@ -312,6 +312,23 @@ export default function AdminPortal({ currentUser }) {
                   </span>
                 </div>
               )}
+              {overview?.storageMode && !overview.storageMode.mongoConnected && (
+                <div className="mt-3 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2.5">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <div className="font-black text-amber-950">
+                      {overview.storageMode.isPlaceholderUri
+                        ? 'MongoDB Placeholder URI Detected ("mongodb+srv://...")'
+                        : 'Temporary Ephemeral Storage (Atlas Disconnected)'}
+                    </div>
+                    <p className="text-[11px] text-amber-800 leading-relaxed">
+                      {overview.storageMode.isPlaceholderUri
+                        ? 'In Vercel Settings, MONGODB_URI is currently set to the example placeholder "mongodb+srv://...". Because this is not a real database URL, data is kept in temporary memory and resets on logout. To make volunteers and ODs permanent for 500+ students, replace it with your real MongoDB Atlas connection string.'
+                        : 'Server is currently operating in container storage. Data will reset on server restart. To enable permanent storage for 500+ concurrent users, configure MONGODB_URI in Vercel settings.'}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1216,6 +1233,22 @@ export default function AdminPortal({ currentUser }) {
               </span>
             </div>
 
+            {/* If MongoDB is not connected, provide the exact 3-step solution */}
+            {!overview?.storageMode?.mongoConnected && (
+              <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200/80 space-y-2">
+                <div className="flex items-center gap-2 text-xs font-black text-amber-950">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>How to connect MongoDB Atlas for 100% permanent data across all devices:</span>
+                </div>
+                <div className="text-xs text-amber-900 space-y-1.5 pl-6 list-decimal">
+                  <div><strong>1. Free MongoDB Atlas Account:</strong> Sign in at <a href="https://cloud.mongodb.com" target="_blank" rel="noreferrer" className="underline font-bold text-sky-800">cloud.mongodb.com</a> and create a Free M0 cluster (takes 30 seconds, 0 cost).</div>
+                  <div><strong>2. Whitelist IP:</strong> In MongoDB Atlas &gt; <em>Network Access</em>, click <em>Add IP Address</em> &gt; choose <strong>Allow Access from Anywhere (0.0.0.0/0)</strong> so Vercel lambdas can connect.</div>
+                  <div><strong>3. Get Connection URI:</strong> Click <em>Connect</em> &gt; <em>Drivers</em> &gt; copy your URI. It looks like:<br /><code className="block mt-1 font-mono text-[11px] bg-white p-2 rounded border border-amber-200 text-slate-800 select-all">mongodb+srv://&lt;username&gt;:&lt;password&gt;@cluster0.xxxx.mongodb.net/arenium?retryWrites=true&w=majority</code></div>
+                  <div><strong>4. Update in Vercel:</strong> Go to Vercel &gt; Project Settings &gt; <em>Environment Variables</em> &gt; Edit <code className="font-mono bg-white px-1 py-0.5 rounded border border-amber-200">MONGODB_URI</code> &gt; paste the real string (replacing <code className="font-mono">mongodb+srv://...</code>) &gt; Redeploy.</div>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-600">
               <div className="p-3.5 bg-white rounded-xl border border-slate-200 space-y-1">
                 <div className="font-bold text-slate-900">1. Instant Rolling Backups</div>
@@ -1223,7 +1256,7 @@ export default function AdminPortal({ currentUser }) {
               </div>
               <div className="p-3.5 bg-white rounded-xl border border-slate-200 space-y-1">
                 <div className="font-bold text-slate-900">2. High Concurrency Pool</div>
-                <p>Configured with MongoDB connection pool (<code className="font-mono text-[10px]">maxPoolSize: 50</code>) to effortlessly handle 500+ students and volunteers at the same time.</p>
+                <p>Configured with MongoDB connection pool (<code className="font-mono text-[10px]">maxPoolSize: 10</code>) to effortlessly handle 500+ students and volunteers at the same time.</p>
               </div>
               <div className="p-3.5 bg-white rounded-xl border border-slate-200 space-y-1">
                 <div className="font-bold text-slate-900">3. Vercel Deployment Ready</div>

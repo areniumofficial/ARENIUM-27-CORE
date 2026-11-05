@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Award, UserPlus, Clock, CheckCircle, Clock3, XCircle, Send, AlertCircle, Sparkles, Calendar, BookOpen, Layers, Search, Check } from 'lucide-react';
+import { Award, UserPlus, Clock, CheckCircle, Clock3, XCircle, Send, AlertCircle, Sparkles, Calendar, BookOpen, Layers, Search, Check, RefreshCw, Users, Shield } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 
 export default function CorePortal({ currentUser }) {
   const [activeTab, setActiveTab] = useState('OD_LEAVE'); // 'OD_LEAVE' or 'ADD_VOLUNTEERS'
+  const [odFilter, setOdFilter] = useState('ALL'); // 'ALL' or 'MY'
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
@@ -21,14 +22,14 @@ export default function CorePortal({ currentUser }) {
   // Volunteer Addition Form State
   const [volName, setVolName] = useState('');
   const [volEmail, setVolEmail] = useState('');
-  const [volPassword, setVolPassword] = useState('');
+  const [volPassword, setVolPassword] = useState('Vol123');
   const [volRollNumber, setVolRollNumber] = useState('');
-  const [volSection, setVolSection] = useState('');
-  const [volBatch, setVolBatch] = useState('');
-  const [volSchool, setVolSchool] = useState('');
-  const [volHod, setVolHod] = useState('');
+  const [volSection, setVolSection] = useState('CSE-01');
+  const [volBatch, setVolBatch] = useState('Batch 2022-26');
+  const [volSchool, setVolSchool] = useState('School of Engineering');
+  const [volHod, setVolHod] = useState('Dr. Ramesh Kumar');
   const [volDutyRole, setVolDutyRole] = useState('Participant QR Attendance & Floor Usher');
-  const [volPhone, setVolPhone] = useState('');
+  const [volPhone, setVolPhone] = useState('+91 90000 00000');
   const [volunteerList, setVolunteerList] = useState([]);
   const [volSearch, setVolSearch] = useState('');
 
@@ -49,14 +50,27 @@ export default function CorePortal({ currentUser }) {
 
   const fetchCoreData = async () => {
     try {
+      // Fetch all core team OD history so organizers have mutual visibility
       const [history, vols] = await Promise.all([
-        apiFetch(`/core/od-history?coreId=${currentUser.id}`),
+        apiFetch('/core/od-history?view=ALL'),
         apiFetch('/core/volunteers')
       ]);
       setOdHistory(history || []);
       setVolunteerList(vols || []);
+
+      // Also mirror to localStorage as emergency client safeguard
+      if (Array.isArray(vols) && vols.length > 0) {
+        try { localStorage.setItem('arenium_saved_volunteers', JSON.stringify(vols)); } catch (_) {}
+      }
     } catch (err) {
       console.error('Failed to load core data:', err);
+      // Attempt local fallback if network briefly dropped
+      try {
+        const cachedVols = localStorage.getItem('arenium_saved_volunteers');
+        if (cachedVols && volunteerList.length === 0) {
+          setVolunteerList(JSON.parse(cachedVols));
+        }
+      } catch (_) {}
     }
   };
 
@@ -105,7 +119,7 @@ export default function CorePortal({ currentUser }) {
 
       if (res.success) {
         setFeedback({ type: 'success', message: 'OD Leave application submitted! Sent to Admin for approval.' });
-        fetchCoreData();
+        await fetchCoreData();
       }
     } catch (err) {
       setFeedback({ type: 'error', message: err.message || 'Failed to submit OD application' });
@@ -131,7 +145,7 @@ export default function CorePortal({ currentUser }) {
         body: JSON.stringify({
           name: volName,
           email: volEmail,
-          password: volPassword,
+          password: volPassword || 'Vol123',
           rollNumber: volRollNumber,
           section: volSection,
           batchNumber: volBatch,
@@ -139,19 +153,19 @@ export default function CorePortal({ currentUser }) {
           hodName: volHod,
           dutyRole: volDutyRole,
           phone: volPhone,
-          addedBy: `${currentUser.name} (Core)`
+          addedBy: `${currentUser.name} (Core Team)`
         })
       });
 
       if (res.success) {
         setFeedback({
           type: 'success',
-          message: `Volunteer "${volName}" registered! Awaiting Admin approval before login activation.`
+          message: `Volunteer "${volName}" registered successfully! Submitted to Admin for approval.`
         });
         setVolName('');
         setVolEmail('');
         setVolRollNumber('');
-        fetchCoreData();
+        await fetchCoreData();
       }
     } catch (err) {
       setFeedback({ type: 'error', message: err.message || 'Failed to add volunteer' });
@@ -159,6 +173,24 @@ export default function CorePortal({ currentUser }) {
       setLoading(false);
     }
   };
+
+  // Derived filtered OD lists
+  const myRequests = odHistory.filter(
+    r => r.targetId === currentUser.id || r.submittedBy?.id === currentUser.id || r.name === currentUser.name
+  );
+  const displayedODs = odFilter === 'MY' ? myRequests : odHistory;
+
+  // Derived filtered volunteers list
+  const filteredVolunteers = volunteerList.filter(v => {
+    if (!volSearch.trim()) return true;
+    const q = volSearch.toLowerCase();
+    return (
+      (v.name || '').toLowerCase().includes(q) ||
+      (v.email || '').toLowerCase().includes(q) ||
+      (v.rollNumber || '').toLowerCase().includes(q) ||
+      (v.dutyRole || '').toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-7">
@@ -189,26 +221,30 @@ export default function CorePortal({ currentUser }) {
           <div className="flex items-center gap-3 bg-slate-50 p-2.5 rounded-2xl border border-slate-200/80">
             <div className="px-3.5 py-1.5 text-center bg-white rounded-xl border border-slate-200/70 shadow-2xs">
               <div className="text-lg font-black text-slate-900">{odHistory.length}</div>
-              <div className="text-[10px] font-bold uppercase text-slate-500">My OD Apps</div>
+              <div className="text-[10px] font-bold uppercase text-slate-500">Team ODs</div>
+            </div>
+            <div className="px-3.5 py-1.5 text-center bg-white rounded-xl border border-slate-200/70 shadow-2xs">
+              <div className="text-lg font-black text-[#006dae]">{myRequests.length}</div>
+              <div className="text-[10px] font-bold uppercase text-slate-500">My Apps</div>
             </div>
             <div className="px-3.5 py-1.5 text-center bg-white rounded-xl border border-slate-200/70 shadow-2xs">
               <div className="text-lg font-black text-slate-900">{volunteerList.length}</div>
-              <div className="text-[10px] font-bold uppercase text-slate-500">Volunteers Added</div>
+              <div className="text-[10px] font-bold uppercase text-slate-500">Volunteers</div>
             </div>
             <div className="px-3.5 py-1.5 text-center bg-white rounded-xl border border-slate-200/70 shadow-2xs">
               <div className="text-lg font-black text-emerald-700">
                 {volunteerList.filter(v => v.status === 'APPROVED').length}
               </div>
-              <div className="text-[10px] font-bold uppercase text-slate-500">Approved Vols</div>
+              <div className="text-[10px] font-bold uppercase text-slate-500">Active Vols</div>
             </div>
           </div>
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex gap-2.5 mt-6 pt-5 border-t border-slate-100">
+        <div className="flex flex-wrap gap-2.5 mt-6 pt-5 border-t border-slate-100">
           <button
             onClick={() => { setActiveTab('OD_LEAVE'); setFeedback(null); }}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all border ${
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all border cursor-pointer ${
               activeTab === 'OD_LEAVE'
                 ? 'bg-gradient-to-r from-[#30AFFF] to-[#2598e0] text-white border-[#30AFFF] shadow-xs'
                 : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
@@ -220,14 +256,14 @@ export default function CorePortal({ currentUser }) {
 
           <button
             onClick={() => { setActiveTab('ADD_VOLUNTEERS'); setFeedback(null); }}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all border ${
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all border cursor-pointer ${
               activeTab === 'ADD_VOLUNTEERS'
                 ? 'bg-gradient-to-r from-[#30AFFF] to-[#2598e0] text-white border-[#30AFFF] shadow-xs'
                 : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
             }`}
           >
             <UserPlus className="w-4 h-4" />
-            <span>Add Volunteers & Track Approvals</span>
+            <span>Add Volunteers & Approval Pipeline ({volunteerList.length})</span>
           </button>
         </div>
       </div>
@@ -250,7 +286,7 @@ export default function CorePortal({ currentUser }) {
         </div>
       )}
 
-      {/* TAB 1: APPLY OD LEAVE */}
+      {/* TAB 1: APPLY OD LEAVE & VIEW ALL CORE REQUESTS */}
       {activeTab === 'OD_LEAVE' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-7">
           
@@ -284,7 +320,7 @@ export default function CorePortal({ currentUser }) {
                 </div>
               </div>
 
-              {/* Smart Hours Preset Buttons (Fast & Feasible) */}
+              {/* Smart Hours Preset Buttons */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">
@@ -294,28 +330,28 @@ export default function CorePortal({ currentUser }) {
                     <button
                       type="button"
                       onClick={() => setHourPreset('ALL')}
-                      className="text-[10px] font-bold text-[#006dae] hover:bg-[#30AFFF]/10 px-1.5 py-0.5 rounded"
+                      className="text-[10px] font-bold text-[#006dae] hover:bg-[#30AFFF]/10 px-1.5 py-0.5 rounded cursor-pointer"
                     >
                       Full Day
                     </button>
                     <button
                       type="button"
                       onClick={() => setHourPreset('MORNING')}
-                      className="text-[10px] font-bold text-[#006dae] hover:bg-[#30AFFF]/10 px-1.5 py-0.5 rounded"
+                      className="text-[10px] font-bold text-[#006dae] hover:bg-[#30AFFF]/10 px-1.5 py-0.5 rounded cursor-pointer"
                     >
                       H1-4
                     </button>
                     <button
                       type="button"
                       onClick={() => setHourPreset('AFTERNOON')}
-                      className="text-[10px] font-bold text-[#006dae] hover:bg-[#30AFFF]/10 px-1.5 py-0.5 rounded"
+                      className="text-[10px] font-bold text-[#006dae] hover:bg-[#30AFFF]/10 px-1.5 py-0.5 rounded cursor-pointer"
                     >
                       H5-8
                     </button>
                     <button
                       type="button"
                       onClick={() => setHourPreset('CLEAR')}
-                      className="text-[10px] font-bold text-slate-500 hover:bg-slate-100 px-1.5 py-0.5 rounded"
+                      className="text-[10px] font-bold text-slate-500 hover:bg-slate-100 px-1.5 py-0.5 rounded cursor-pointer"
                     >
                       Clear
                     </button>
@@ -330,7 +366,7 @@ export default function CorePortal({ currentUser }) {
                         key={hr}
                         type="button"
                         onClick={() => toggleHour(hr)}
-                        className={`p-2 rounded-xl text-center transition-all border ${
+                        className={`p-2 rounded-xl text-center transition-all border cursor-pointer ${
                           isSelected
                             ? 'bg-[#30AFFF] text-white border-[#30AFFF] shadow-xs'
                             : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300'
@@ -428,71 +464,125 @@ export default function CorePortal({ currentUser }) {
             </form>
           </div>
 
-          {/* Core OD History */}
+          {/* Core OD Pipeline (Shared Across All Core Members) */}
           <div className="lg:col-span-7 bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
               <div>
-                <h2 className="text-lg font-black text-slate-900">My OD Request History</h2>
-                <p className="text-xs text-slate-500">Live approval status from Admin Supervisor</p>
+                <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-[#30AFFF]" />
+                  Core Team OD Pipeline
+                </h2>
+                <p className="text-xs text-slate-500">Live approval status for all Core Organizers</p>
               </div>
-              <button
-                onClick={fetchCoreData}
-                className="text-xs font-bold text-[#006dae] hover:underline"
-              >
-                Refresh
-              </button>
+
+              <div className="flex items-center gap-2">
+                {/* Filter toggle: ALL vs MY */}
+                <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200/80 text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setOdFilter('ALL')}
+                    className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                      odFilter === 'ALL'
+                        ? 'bg-white text-slate-900 shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    All Core ({odHistory.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOdFilter('MY')}
+                    className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                      odFilter === 'MY'
+                        ? 'bg-white text-[#006dae] shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    My Requests ({myRequests.length})
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={fetchCoreData}
+                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all cursor-pointer"
+                  title="Refresh OD list"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
-            {odHistory.length === 0 ? (
+            {displayedODs.length === 0 ? (
               <div className="text-center py-12 text-slate-400 text-sm">
-                No OD applications submitted yet.
+                {odFilter === 'MY'
+                  ? "You haven't submitted any OD applications yet."
+                  : 'No Core Team OD applications found.'}
               </div>
             ) : (
               <div className="space-y-3">
-                {odHistory.map((item) => (
-                  <div
-                    key={item.id}
-                    className="p-4 rounded-2xl border border-slate-200 bg-white hover:border-[#30AFFF]/40 transition-all space-y-2 shadow-2xs"
-                  >
-                    <div className="flex items-center justify-between">
+                {displayedODs.map((item) => {
+                  const isMine = item.targetId === currentUser.id || item.submittedBy?.id === currentUser.id || item.name === currentUser.name;
+                  return (
+                    <div
+                      key={item.id}
+                      className={`p-4 rounded-2xl border transition-all space-y-2 shadow-2xs ${
+                        isMine
+                          ? 'border-[#30AFFF]/50 bg-sky-50/20'
+                          : 'border-slate-200 bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-black text-slate-900">
+                            {item.name}
+                          </span>
+                          {isMine && (
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-[#30AFFF]/20 text-[#006dae] border border-[#30AFFF]/40">
+                              You
+                            </span>
+                          )}
+                          <span className="text-xs text-slate-500 font-semibold">
+                            Date: {item.date}
+                          </span>
+                        </div>
+
+                        {item.status === 'APPROVED' ? (
+                          <span className="flex items-center gap-1 text-xs font-bold text-emerald-800 bg-[#D8FFC5]/70 px-2.5 py-0.5 rounded-full border border-[#C4F7CA]">
+                            <CheckCircle className="w-3.5 h-3.5 text-emerald-700" /> Approved
+                          </span>
+                        ) : item.status === 'REJECTED' ? (
+                          <span className="flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
+                            <XCircle className="w-3.5 h-3.5 text-rose-600" /> Rejected
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-xs font-bold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
+                            <Clock3 className="w-3.5 h-3.5 text-amber-600" /> Pending Admin
+                          </span>
+                        )}
+                      </div>
+
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-900">
-                          Date: {item.date}
-                        </span>
                         <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-[#30AFFF]/15 text-[#006dae] border border-[#30AFFF]/30">
                           {item.hoursFormatted}
                         </span>
                       </div>
 
-                      {item.status === 'APPROVED' ? (
-                        <span className="flex items-center gap-1 text-xs font-bold text-emerald-800 bg-[#D8FFC5]/70 px-2.5 py-0.5 rounded-full border border-[#C4F7CA]">
-                          <CheckCircle className="w-3.5 h-3.5 text-emerald-700" /> Approved
-                        </span>
-                      ) : item.status === 'REJECTED' ? (
-                        <span className="flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
-                          <XCircle className="w-3.5 h-3.5 text-rose-600" /> Rejected
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-xs font-bold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
-                          <Clock3 className="w-3.5 h-3.5 text-amber-600" /> Pending Admin
-                        </span>
-                      )}
-                    </div>
+                      <p className="text-xs text-slate-600 font-medium">
+                        "{item.reason}"
+                      </p>
 
-                    <p className="text-xs text-slate-600 font-medium">
-                      {item.reason}
-                    </p>
-
-                    <div className="flex flex-wrap items-center justify-between pt-2 border-t border-slate-100 text-[11px] text-slate-500">
-                      <span>Roll: {item.rollNumber} • {item.section} • {item.schoolName}</span>
-                      {item.adminRemark && (
-                        <span className="font-semibold text-slate-700 italic">
-                          Remark: "{item.adminRemark}"
-                        </span>
-                      )}
+                      <div className="flex flex-wrap items-center justify-between pt-2 border-t border-slate-100 text-[11px] text-slate-500">
+                        <span>Roll: {item.rollNumber} • {item.section} • {item.schoolName} • HOD: {item.hodName}</span>
+                        {item.adminRemark && (
+                          <span className="font-semibold text-slate-700 italic">
+                            Remark: "{item.adminRemark}"
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -631,7 +721,7 @@ export default function CorePortal({ currentUser }) {
                   type="text"
                   value={volDutyRole}
                   onChange={(e) => setVolDutyRole(e.target.value)}
-                  placeholder="Gate 1 Verification or Stage Attendance"
+                  placeholder="Participant QR Attendance & Floor Usher"
                   className="w-full px-3 py-2 rounded-xl border border-slate-300 font-medium text-slate-900 bg-white"
                 />
               </div>
@@ -649,64 +739,87 @@ export default function CorePortal({ currentUser }) {
 
           {/* Volunteer Roster */}
           <div className="lg:col-span-7 bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
               <div>
-                <h2 className="text-lg font-black text-slate-900">Volunteer Approval Pipeline</h2>
+                <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                  <Users className="w-5 h-5 text-emerald-600" />
+                  Volunteer Pipeline ({volunteerList.length})
+                </h2>
                 <p className="text-xs text-slate-500">
                   Volunteers awaiting Admin review or active for duty
                 </p>
               </div>
-              <button
-                onClick={fetchCoreData}
-                className="text-xs font-bold text-[#006dae] hover:underline"
-              >
-                Refresh
-              </button>
+
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                  <input
+                    type="text"
+                    value={volSearch}
+                    onChange={(e) => setVolSearch(e.target.value)}
+                    placeholder="Search volunteer..."
+                    className="pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50 w-36 sm:w-44 focus:bg-white"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={fetchCoreData}
+                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all cursor-pointer"
+                  title="Refresh Volunteers"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-3">
-              {volunteerList.map((vol) => (
-                <div
-                  key={vol.id}
-                  className="p-4 rounded-2xl border border-slate-200 bg-white hover:border-[#30AFFF]/40 transition-all space-y-2 shadow-2xs"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-sm font-bold text-slate-900 block">{vol.name}</span>
-                      <span className="text-xs text-slate-500">{vol.email} • Roll: {vol.rollNumber}</span>
+            {filteredVolunteers.length === 0 ? (
+              <div className="text-center py-12 text-slate-400 text-sm">
+                {volSearch ? 'No volunteers matching search criteria.' : 'No volunteers registered yet. Add a volunteer using the form.'}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredVolunteers.map((vol) => (
+                  <div
+                    key={vol.id}
+                    className="p-4 rounded-2xl border border-slate-200 bg-white hover:border-[#30AFFF]/40 transition-all space-y-2 shadow-2xs"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-sm font-bold text-slate-900 block">{vol.name}</span>
+                        <span className="text-xs text-slate-500">{vol.email} • Roll: {vol.rollNumber}</span>
+                      </div>
+
+                      {vol.status === 'APPROVED' ? (
+                        <span className="flex items-center gap-1 text-xs font-bold text-emerald-800 bg-[#D8FFC5]/70 px-2.5 py-0.5 rounded-full border border-[#C4F7CA]">
+                          <CheckCircle className="w-3.5 h-3.5 text-emerald-700" /> Approved
+                        </span>
+                      ) : vol.status === 'REJECTED' ? (
+                        <span className="flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
+                          <XCircle className="w-3.5 h-3.5 text-rose-600" /> Rejected
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-xs font-bold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
+                          <Clock3 className="w-3.5 h-3.5 text-amber-600" /> Pending Admin
+                        </span>
+                      )}
                     </div>
 
-                    {vol.status === 'APPROVED' ? (
-                      <span className="flex items-center gap-1 text-xs font-bold text-emerald-800 bg-[#D8FFC5]/70 px-2.5 py-0.5 rounded-full border border-[#C4F7CA]">
-                        <CheckCircle className="w-3.5 h-3.5 text-emerald-700" /> Approved
-                      </span>
-                    ) : vol.status === 'REJECTED' ? (
-                      <span className="flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
-                        <XCircle className="w-3.5 h-3.5 text-rose-600" /> Rejected
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-xs font-bold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
-                        <Clock3 className="w-3.5 h-3.5 text-amber-600" /> Pending Admin
-                      </span>
-                    )}
-                  </div>
+                    <div className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 flex flex-wrap gap-x-4 gap-y-1">
+                      <span><strong>Duty:</strong> {vol.dutyRole}</span>
+                      <span><strong>Section:</strong> {vol.section}</span>
+                      <span><strong>Batch:</strong> {vol.batchNumber}</span>
+                      <span><strong>School:</strong> {vol.schoolName}</span>
+                      <span><strong>HOD:</strong> {vol.hodName}</span>
+                    </div>
 
-                  <div className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 flex flex-wrap gap-x-4 gap-y-1">
-                    <span><strong>Duty:</strong> {vol.dutyRole}</span>
-                    <span><strong>Section:</strong> {vol.section}</span>
-                    <span><strong>Batch:</strong> {vol.batchNumber}</span>
-                    <span><strong>School:</strong> {vol.schoolName}</span>
-                    <span><strong>HOD:</strong> {vol.hodName}</span>
+                    <div className="flex items-center justify-between pt-1 text-[11px] text-slate-400">
+                      <span>Added by: {vol.addedBy || 'Core Team'}</span>
+                      {vol.approvedBy && <span className="text-emerald-700 font-semibold">Approved by: {vol.approvedBy}</span>}
+                    </div>
                   </div>
-
-                  <div className="text-[11px] text-slate-400 flex justify-between">
-                    <span>Added by: {vol.addedBy || 'Core'}</span>
-                    <span>{vol.approvedBy ? `Approved by: ${vol.approvedBy}` : 'Pending Admin Approval'}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
+                ))}
+              </div>
+            )}
           </div>
 
         </div>

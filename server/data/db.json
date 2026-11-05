@@ -26,11 +26,11 @@
       "password": "Kaush2507",
       "name": "Kaushal Singh",
       "role": "CORE_TEAM",
-      "rollNumber": "20211CSE0112",
-      "section": "CSE-04",
+      "rollNumber": "20241BCA0000",
+      "section": "BCA01",
       "batchNumber": "Batch 2021-25",
-      "schoolName": "School of Engineering",
-      "hodName": "Dr. Ramesh Kumar",
+      "schoolName": "SOIS",
+      "hodName": "Dr. Vettermani",
       "phone": "+91 98112 23344"
     },
     {
@@ -39,11 +39,11 @@
       "password": "Abhyas2108",
       "name": "Abhyas Kathuria",
       "role": "CORE_TEAM",
-      "rollNumber": "20211CSE0145",
+      "rollNumber": "20241BCI0063",
       "section": "CSE-04",
-      "batchNumber": "Batch 2021-25",
-      "schoolName": "School of Engineering",
-      "hodName": "Dr. Ramesh Kumar",
+      "batchNumber": "Batch 2024-27",
+      "schoolName": "SOIS",
+      "hodName": "Dr. Vetermani sir",
       "phone": "+91 98223 34455"
     },
     {
@@ -52,11 +52,11 @@
       "password": "Ashlin01",
       "name": "Ashlin Siddharth",
       "role": "CORE_TEAM",
-      "rollNumber": "20211CSE0089",
-      "section": "CSE-02",
+      "rollNumber": "20241BCD2234",
+      "section": "BCA DS02",
       "batchNumber": "Batch 2021-25",
       "schoolName": "School of Engineering",
-      "hodName": "Dr. Ramesh Kumar",
+      "hodName": "Dr. VMS",
       "phone": "+91 98334 45566"
     },
     {
@@ -65,11 +65,11 @@
       "password": "Vimal69",
       "name": "Vimal Raj",
       "role": "CORE_TEAM",
-      "rollNumber": "20211CSE0204",
-      "section": "CSE-06",
+      "rollNumber": "20211BCA1234",
+      "section": "BCA DS03",
       "batchNumber": "Batch 2021-25",
-      "schoolName": "School of Engineering",
-      "hodName": "Dr. Ramesh Kumar",
+      "schoolName": "SOIS",
+      "hodName": "Dr. VMS",
       "phone": "+91 98445 56677"
     }
   ],
@@ -77,7 +77,104 @@
   "teams": [],
   "odRequests": [
     {
-      "id": "od-core-e40070f1",
+      "id": "od-core-ashlin",
+      "requestType": "CORE_TEAM",
+      "targetId": "core-3",
+      "name": "Ashlin Siddharth",
+      "rollNumber": "20241BCD2234",
+      "section": "BCA DS02",
+      "batchNumber": "Batch 2021-25",
+      "schoolName": "School of Engineering",
+      "hodName": "Dr. VMS",
+      "teamName": "ARENIUM CORE TEAM",
+      "date": "2026-11-05",
+      "hours": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "hoursFormatted": "Hour 1, Hour 2, Hour 3, Hour 4",
+      "reason": "Core Management, Tech Arena Setup and Event Coordination",
+      "submittedBy": {
+        "id": "core-3",
+        "name": "Ashlin Siddharth",
+        "role": "CORE_TEAM"
+      },
+      "status": "PENDING",
+      "adminRemark": "",
+      "reviewedBy": null,
+      "reviewedAt": null,
+      "createdAt": "2026-11-05T04:30:00.000Z"
+    },
+    {
+      "id": "od-core-vimal",
+      "requestType": "CORE_TEAM",
+      "targetId": "core-4",
+      "name": "Vimal Raj",
+      "rollNumber": "20211BCA1234",
+      "section": "BCA DS03",
+      "batchNumber": "Batch 2021-25",
+      "schoolName": "SOIS",
+      "hodName": "Dr. VMS",
+      "teamName": "ARENIUM CORE TEAM",
+      "date": "2026-11-05",
+      "hours": [
+        1,
+        2,
+        3,
+        4,
+        7
+      ],
+      "hoursFormatted": "Hour 1, Hour 2, Hour 3, Hour 4, Hour 7",
+      "reason": "Core Management, Tech Arena Setup and Event Coordination",
+      "submittedBy": {
+        "id": "core-4",
+        "name": "Vimal Raj",
+        "role": "CORE_TEAM"
+      },
+      "status": "PENDING",
+      "adminRemark": "",
+      "reviewedBy": null,
+      "reviewedAt": null,
+      "createdAt": "2026-11-05T04:31:00.000Z"
+    },
+    {
+      "id": "od-core-kaushal",
+      "requestType": "CORE_TEAM",
+      "targetId": "core-1",
+      "name": "Kaushal Singh",
+      "rollNumber": "20241BCA0000",
+      "section": "BCA01",
+      "batchNumber": "Batch 2021-25",
+      "schoolName": "SOIS",
+      "hodName": "Dr. Vettermani",
+      "teamName": "ARENIUM CORE TEAM",
+      "date": "2026-11-05",
+      "hours": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "hoursFormatted": "Hour 1, Hour 2, Hour 3, Hour 4, Hour 5, Hour 6, Hour 7",
+      "reason": "Core Management, Tech Arena Setup and Event Coordination",
+      "submittedBy": {
+        "id": "core-1",
+        "name": "Kaushal Singh",
+        "role": "CORE_TEAM"
+      },
+      "status": "PENDING",
+      "adminRemark": "",
+      "reviewedBy": null,
+      "reviewedAt": null,
+      "createdAt": "2026-11-05T04:32:00.000Z"
+    },
+    {
+      "id": "od-core-abhyas",
       "requestType": "CORE_TEAM",
       "targetId": "core-2",
       "name": "Abhyas Kathuria",
@@ -106,7 +203,7 @@
       "adminRemark": "",
       "reviewedBy": null,
       "reviewedAt": null,
-      "createdAt": "2026-11-04T17:01:31.416Z"
+      "createdAt": "2026-11-04T12:00:00.000Z"
     }
   ],
   "scanLogs": []
