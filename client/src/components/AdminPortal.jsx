@@ -29,11 +29,12 @@ export default function AdminPortal({ currentUser }) {
   const [statusFilter, setStatusFilter] = useState('PENDING'); // 'PENDING', 'APPROVED', 'REJECTED', 'ALL'
   const [selectedIds, setSelectedIds] = useState([]); // for batch selection
 
-  // Excel Export Filter State
-  const [exportDate, setExportDate] = useState(new Date().toISOString().split('T')[0]);
+  // Excel Export Filter State (Defaults to 'ALL' so Excel is immediately filled with all student records)
+  const [exportDate, setExportDate] = useState('ALL');
   const [exportHour, setExportHour] = useState('ALL');
   const [exportSection, setExportSection] = useState('ALL');
-  const [exportStatus, setExportStatus] = useState('APPROVED');
+  const [exportStatus, setExportStatus] = useState('ALL');
+  const [warningDismissed, setWarningDismissed] = useState(false);
 
   // Single Action Remark Modal State
   const [actionModal, setActionModal] = useState({
@@ -206,22 +207,22 @@ export default function AdminPortal({ currentUser }) {
   // Compute records for Excel Preview
   const getFilteredExcelRecords = () => {
     let allRecords = [
-      ...requestsData.coreRequests,
-      ...requestsData.volunteers.attendanceApprovals,
-      ...requestsData.participantRequests
+      ...(requestsData.coreRequests || []),
+      ...(requestsData.volunteers?.attendanceApprovals || []),
+      ...(requestsData.participantRequests || [])
     ];
 
-    if (exportStatus !== 'ALL') {
+    if (exportStatus && exportStatus !== 'ALL') {
       allRecords = allRecords.filter(r => r.status === exportStatus);
     }
     if (exportDate && exportDate !== 'ALL') {
       allRecords = allRecords.filter(r => r.date === exportDate);
     }
-    if (exportHour !== 'ALL') {
+    if (exportHour && exportHour !== 'ALL') {
       const hrNum = parseInt(exportHour, 10);
       allRecords = allRecords.filter(r => Array.isArray(r.hours) && r.hours.includes(hrNum));
     }
-    if (exportSection !== 'ALL') {
+    if (exportSection && exportSection !== 'ALL') {
       allRecords = allRecords.filter(r => r.requestType === exportSection);
     }
 
@@ -235,7 +236,37 @@ export default function AdminPortal({ currentUser }) {
       sectionType: exportSection,
       status: exportStatus
     });
-    window.open(url, '_blank');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ARENIUM_OD_REPORT_${exportDate === 'ALL' ? 'CONSOLIDATED' : exportDate}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  // Quick 1-click approve all pending requests from Excel tab
+  const handleQuickApproveAllPending = async () => {
+    const pendingCoreIds = (requestsData.coreRequests || [])
+      .filter(r => r.status === 'PENDING')
+      .map(r => r.id);
+    const pendingAttIds = (requestsData.volunteers?.attendanceApprovals || [])
+      .filter(r => r.status === 'PENDING')
+      .map(r => r.id);
+    const pendingPartIds = (requestsData.participantRequests || [])
+      .filter(r => r.status === 'PENDING')
+      .map(r => r.id);
+
+    const allPendingIds = [...pendingCoreIds, ...pendingAttIds, ...pendingPartIds];
+    if (allPendingIds.length === 0) {
+      setFeedback({ type: 'info', message: 'No pending requests to approve.' });
+      return;
+    }
+
+    await handleBatchReviewOD(allPendingIds, 'APPROVED');
+    setFeedback({
+      type: 'success',
+      message: `Successfully approved all ${allPendingIds.length} pending requests! Excel sheet updated.`
+    });
   };
 
   const handleDownloadBackup = () => {
@@ -312,21 +343,40 @@ export default function AdminPortal({ currentUser }) {
                   </span>
                 </div>
               )}
-              {overview?.storageMode && !overview.storageMode.mongoConnected && (
-                <div className="mt-3 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2.5">
-                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                  <div className="space-y-0.5">
-                    <div className="font-black text-amber-950">
-                      {overview.storageMode.isPlaceholderUri
-                        ? 'MongoDB Placeholder URI Detected ("mongodb+srv://...")'
-                        : 'Temporary Ephemeral Storage (Atlas Disconnected)'}
+              {overview?.storageMode && !overview.storageMode.mongoConnected && !warningDismissed && (
+                <div className="mt-3 p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start justify-between gap-3 shadow-2xs">
+                  <div className="flex items-start gap-2.5">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <div className="font-black text-amber-950 text-xs sm:text-sm">
+                        {overview.storageMode.isPlaceholderUri
+                          ? 'MongoDB Placeholder URI Detected ("mongodb+srv://...")'
+                          : 'Temporary Ephemeral Storage (Atlas Disconnected)'}
+                      </div>
+                      <p className="text-[11px] text-amber-800 leading-relaxed">
+                        {overview.storageMode.isPlaceholderUri
+                          ? 'In Vercel Settings, MONGODB_URI is currently set to the example placeholder "mongodb+srv://...". Because this is not a real database URL, data is kept in temporary memory and resets on logout. To make volunteers and ODs permanent for 500+ students, replace it with your real MongoDB Atlas connection string.'
+                          : 'Server is currently operating in container storage. Data will reset on server restart. To enable permanent storage for 500+ concurrent users, configure MONGODB_URI in Vercel settings.'}
+                      </p>
+                      <div className="flex items-center gap-3 pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setActiveSection('BACKUP')}
+                          className="text-[11px] font-black text-sky-800 hover:text-sky-950 underline cursor-pointer"
+                        >
+                          Step-by-step fix guide &rarr;
+                        </button>
+                      </div>
                     </div>
-                    <p className="text-[11px] text-amber-800 leading-relaxed">
-                      {overview.storageMode.isPlaceholderUri
-                        ? 'In Vercel Settings, MONGODB_URI is currently set to the example placeholder "mongodb+srv://...". Because this is not a real database URL, data is kept in temporary memory and resets on logout. To make volunteers and ODs permanent for 500+ students, replace it with your real MongoDB Atlas connection string.'
-                        : 'Server is currently operating in container storage. Data will reset on server restart. To enable permanent storage for 500+ concurrent users, configure MONGODB_URI in Vercel settings.'}
-                    </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setWarningDismissed(true)}
+                    className="text-amber-500 hover:text-amber-800 p-1 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer shrink-0"
+                    title="Dismiss notification"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
               )}
             </div>
@@ -1006,22 +1056,40 @@ export default function AdminPortal({ currentUser }) {
           {/* Export Filter Controls */}
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 p-5 rounded-2xl bg-slate-50 border border-slate-200/80">
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                Filter by Date
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">
+                  Filter by Date
+                </label>
+                <div className="flex items-center gap-1.5 text-[10px]">
+                  <button
+                    type="button"
+                    onClick={() => setExportDate('ALL')}
+                    className={`px-1.5 py-0.5 rounded font-bold cursor-pointer ${
+                      exportDate === 'ALL' ? 'bg-[#30AFFF] text-white' : 'text-slate-500 hover:text-slate-900 bg-white border border-slate-200'
+                    }`}
+                  >
+                    All Dates
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setExportDate(new Date().toISOString().split('T')[0])}
+                    className={`px-1.5 py-0.5 rounded font-bold cursor-pointer ${
+                      exportDate !== 'ALL' ? 'bg-[#30AFFF] text-white' : 'text-slate-500 hover:text-slate-900 bg-white border border-slate-200'
+                    }`}
+                  >
+                    Today
+                  </button>
+                </div>
+              </div>
               <input
                 type="date"
-                value={exportDate}
-                onChange={(e) => setExportDate(e.target.value)}
+                value={exportDate === 'ALL' ? '' : exportDate}
+                onChange={(e) => setExportDate(e.target.value || 'ALL')}
                 className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-900 bg-white"
               />
-              <button
-                type="button"
-                onClick={() => setExportDate('ALL')}
-                className="text-[10px] font-bold text-[#006dae] hover:underline mt-1"
-              >
-                Include All Dates
-              </button>
+              <span className="text-[10px] text-slate-400 block mt-1">
+                {exportDate === 'ALL' ? 'Currently including records from all dates' : `Filtered to date: ${exportDate}`}
+              </span>
             </div>
 
             <div>
@@ -1031,7 +1099,7 @@ export default function AdminPortal({ currentUser }) {
               <select
                 value={exportHour}
                 onChange={(e) => setExportHour(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-900 bg-white"
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-900 bg-white cursor-pointer"
               >
                 <option value="ALL">All Hours (1-8)</option>
                 {[1, 2, 3, 4, 5, 6, 7, 8].map(h => (
@@ -1047,7 +1115,7 @@ export default function AdminPortal({ currentUser }) {
               <select
                 value={exportSection}
                 onChange={(e) => setExportSection(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-900 bg-white"
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-900 bg-white cursor-pointer"
               >
                 <option value="ALL">All Sections (Consolidated)</option>
                 <option value="CORE_TEAM">Core Team Only</option>
@@ -1063,23 +1131,46 @@ export default function AdminPortal({ currentUser }) {
               <select
                 value={exportStatus}
                 onChange={(e) => setExportStatus(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-900 bg-white"
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-900 bg-white cursor-pointer"
               >
-                <option value="APPROVED">Approved Only (Recommended)</option>
-                <option value="ALL">All Statuses (Approved + Pending)</option>
+                <option value="ALL">All Statuses (Approved + Pending) [Recommended]</option>
+                <option value="APPROVED">Approved Only</option>
+                <option value="PENDING">Pending Only</option>
               </select>
             </div>
           </div>
 
-          {/* Live Data Preview Table */}
+          {/* Quick Actions & Live Data Preview Table */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700">
-                Excel Sheet Preview ({getFilteredExcelRecords().length} Records matching filters):
-              </span>
-              <span className="text-[11px] text-slate-500 font-mono">
-                ARENIUM_OD_REPORT_{exportDate}.xlsx
-              </span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-slate-900">
+                  Excel Sheet Preview ({getFilteredExcelRecords().length} Records):
+                </span>
+                <span className="text-[11px] text-slate-500 font-mono">
+                  ARENIUM_OD_REPORT_{exportDate === 'ALL' ? 'CONSOLIDATED' : exportDate}.xlsx
+                </span>
+              </div>
+
+              {/* Fast Action Button to Approve All Pending */}
+              {(() => {
+                const pendingCount = [
+                  ...(requestsData.coreRequests || []),
+                  ...(requestsData.volunteers?.attendanceApprovals || []),
+                  ...(requestsData.participantRequests || [])
+                ].filter(r => r.status === 'PENDING').length;
+
+                return pendingCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={handleQuickApproveAllPending}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 text-xs font-bold transition-all cursor-pointer shadow-2xs self-start sm:self-auto"
+                  >
+                    <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Approve All Pending ({pendingCount})</span>
+                  </button>
+                ) : null;
+              })()}
             </div>
 
             <div className="overflow-x-auto rounded-2xl border border-slate-200 shadow-2xs">
@@ -1099,15 +1190,44 @@ export default function AdminPortal({ currentUser }) {
                 <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                   {getFilteredExcelRecords().length === 0 ? (
                     <tr>
-                      <td colSpan="8" className="text-center py-8 text-slate-400">
-                        No records match the current export criteria.
+                      <td colSpan="8" className="text-center py-10 text-slate-500 space-y-2">
+                        <div className="font-bold text-slate-700">No records match the current export filters.</div>
+                        <p className="text-xs text-slate-400">
+                          Try setting <strong>Approval Status</strong> to "All Statuses (Approved + Pending)" or click below:
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setExportDate('ALL');
+                            setExportHour('ALL');
+                            setExportSection('ALL');
+                            setExportStatus('ALL');
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#30AFFF] text-white font-bold text-xs shadow-2xs hover:bg-[#2090e0] cursor-pointer"
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                          <span>Reset Filters & Show All Records</span>
+                        </button>
                       </td>
                     </tr>
                   ) : (
                     getFilteredExcelRecords().map((rec, index) => (
                       <tr key={rec.id} className="hover:bg-slate-50/80 transition-colors">
                         <td className="py-2.5 px-3 font-mono font-bold text-slate-900">{index + 1}</td>
-                        <td className="py-2.5 px-3 font-bold text-slate-900">{rec.name}</td>
+                        <td className="py-2.5 px-3 font-bold text-slate-900">
+                          <div className="flex items-center gap-1.5">
+                            <span>{rec.name}</span>
+                            <span className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded ${
+                              rec.status === 'APPROVED'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : rec.status === 'REJECTED'
+                                ? 'bg-rose-100 text-rose-800'
+                                : 'bg-amber-100 text-amber-800'
+                            }`}>
+                              {rec.status}
+                            </span>
+                          </div>
+                        </td>
                         <td className="py-2.5 px-3 font-mono text-slate-700">{rec.rollNumber}</td>
                         <td className="py-2.5 px-3">{rec.section}</td>
                         <td className="py-2.5 px-3">{rec.batchNumber}</td>

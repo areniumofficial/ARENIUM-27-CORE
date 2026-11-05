@@ -843,7 +843,7 @@ app.get('/api/admin/teams', async (req, res) => {
 // ==========================================
 
 app.get('/api/admin/export-excel', async (req, res) => {
-  const { date, hour, sectionType, status = 'APPROVED' } = req.query;
+  const { date = 'ALL', hour = 'ALL', sectionType = 'ALL', status = 'ALL' } = req.query;
   const db = await readDB();
 
   let records = db.odRequests || [];
