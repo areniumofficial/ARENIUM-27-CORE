@@ -38,6 +38,10 @@ export function getExcelExportUrl(params = {}) {
   return `${API_BASE}/admin/export-excel?${query}`;
 }
 
+export function getRegistrationsExcelExportUrl() {
+  return `${API_BASE}/registrations/export-excel`;
+}
+
 export function getBackupExportUrl() {
   return `${API_BASE}/admin/export-backup`;
 }

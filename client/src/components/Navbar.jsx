@@ -87,6 +87,18 @@ export default function Navbar({ currentUser, onLogout, serverOnline }) {
                   </div>
                 </div>
 
+                {/* Direct Link to Main Fest Website */}
+                <a
+                  href={typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://localhost:8000' : 'https://kaushal-13-23.github.io/Arenium/'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-[#30AFFF]/10 text-[#006dae] hover:bg-[#30AFFF]/20 border border-[#30AFFF]/30 transition-all shadow-2xs"
+                  title="Open ARENIUM 27 Tech Fest Public Website (Student Registration & Pass Portal)"
+                >
+                  <span>🌐</span>
+                  <span>Fest Website</span>
+                </a>
+
                 {/* Mobile / Tablet QR modal trigger */}
                 <button
                   onClick={() => setPhoneModalOpen(true)}

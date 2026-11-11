@@ -91,7 +91,7 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess, title, 
           <div className="flex items-center gap-2">
             <Camera className="w-5 h-5 text-[#006dae]" />
             <h3 className="font-black text-sm sm:text-base tracking-tight">
-              {title || (mode === 'TEAM' ? 'Team QR Verification Scanner' : 'Participant Attendance Scanner')}
+              {title || (mode === 'GATE_PASS' ? 'ARENIUM 27 Delegate Gate Pass Scanner' : mode === 'TEAM' ? 'Team QR Verification Scanner' : 'Participant Attendance Scanner')}
             </h3>
           </div>
           <button
@@ -133,14 +133,14 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess, title, 
           {/* Manual Input */}
           <form onSubmit={handleManualSubmit} className="space-y-1.5 pt-2 border-t border-slate-100">
             <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-              {mode === 'TEAM' ? 'Manual Team Name Input:' : 'Manual Roll Number / QR Data Input:'}
+              {mode === 'GATE_PASS' ? 'Manual Pass ID / USN / UTR:' : mode === 'TEAM' ? 'Manual Team Name Input:' : 'Manual Roll Number / QR Data Input:'}
             </label>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
-                placeholder={mode === 'TEAM' ? 'Enter Team Name...' : 'Enter Roll No (e.g. 20231CSE0001)...'}
+                placeholder={mode === 'GATE_PASS' ? 'Enter Reg ID (ARENIUM27-REG-1042) or USN...' : mode === 'TEAM' ? 'Enter Team Name...' : 'Enter Roll No (e.g. 20231CSE0001)...'}
                 className="flex-1 px-3 py-2.5 text-xs border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#30AFFF]"
               />
               <button

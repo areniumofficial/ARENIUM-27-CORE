@@ -2,15 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { 
   Shield, CheckCircle2, XCircle, Clock3, FileSpreadsheet, Download, 
   Users, Award, UserCheck, Filter, RefreshCw, AlertCircle, Layers, Check, X, Sparkles, Search, CheckSquare, Square,
-  Database, UploadCloud, Server
+  Database, UploadCloud, Server, Ticket, QrCode, Eye, Trash2, ExternalLink
 } from 'lucide-react';
-import { apiFetch, getExcelExportUrl, getBackupExportUrl } from '../utils/api';
+import { apiFetch, getExcelExportUrl, getRegistrationsExcelExportUrl, getBackupExportUrl } from '../utils/api';
 
 export default function AdminPortal({ currentUser }) {
-  const [activeSection, setActiveSection] = useState('CORE_TEAM'); // 'CORE_TEAM', 'VOLUNTEERS', 'PARTICIPANTS', 'EXCEL_EXPORT', or 'BACKUP'
+  const [activeSection, setActiveSection] = useState('CORE_TEAM'); // 'CORE_TEAM', 'VOLUNTEERS', 'PARTICIPANTS', 'REGISTRATIONS', 'EXCEL_EXPORT', or 'BACKUP'
   const [loading, setLoading] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [feedback, setFeedback] = useState(null);
+
+  // Delegate Registrations State (ARENIUM 27 Sync & Excel Engine)
+  const [registrations, setRegistrations] = useState([]);
+  const [regStats, setRegStats] = useState({ total: 0, verified: 0, pending: 0, checkedIn: 0, rejected: 0 });
+  const [regStatusFilter, setRegStatusFilter] = useState('ALL');
+  const [regSearch, setRegSearch] = useState('');
+  const [proofModalReg, setProofModalReg] = useState(null);
+  const [importingExcel, setImportingExcel] = useState(false);
 
   // Portal data
   const [overview, setOverview] = useState(null);
@@ -55,12 +63,23 @@ export default function AdminPortal({ currentUser }) {
     setSelectedIds([]);
   }, [activeSection, statusFilter]);
 
+  const fetchRegistrations = async () => {
+    try {
+      const data = await apiFetch('/registrations');
+      setRegistrations(data.registrations || []);
+      if (data.stats) setRegStats(data.stats);
+    } catch (err) {
+      console.warn('Failed to fetch registrations:', err);
+    }
+  };
+
   const fetchAdminData = async () => {
     setLoading(true);
     try {
       const [stats, reqs] = await Promise.all([
         apiFetch('/admin/overview'),
-        apiFetch('/admin/requests')
+        apiFetch('/admin/requests'),
+        fetchRegistrations()
       ]);
       setOverview(stats);
       setRequestsData(reqs);
@@ -70,6 +89,105 @@ export default function AdminPortal({ currentUser }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleVerifyPayment = async (regId) => {
+    try {
+      const res = await apiFetch(`/registrations/${regId}/verify-payment`, {
+        method: 'POST',
+        body: JSON.stringify({ adminName: currentUser.name })
+      });
+      setFeedback({ type: 'success', message: res.message });
+      fetchRegistrations();
+      if (proofModalReg && proofModalReg.id === regId) {
+        setProofModalReg({ ...proofModalReg, status: 'Confirmed', paymentVerified: true });
+      }
+    } catch (err) {
+      setFeedback({ type: 'error', message: err.message || 'Failed to verify payment' });
+    }
+  };
+
+  const handleRejectPayment = async (regId) => {
+    const reason = window.prompt('Enter reason for payment rejection (optional):', 'UTR transaction reference mismatch');
+    try {
+      const res = await apiFetch(`/registrations/${regId}/reject-payment`, {
+        method: 'POST',
+        body: JSON.stringify({ reason, adminName: currentUser.name })
+      });
+      setFeedback({ type: 'info', message: res.message });
+      fetchRegistrations();
+      if (proofModalReg && proofModalReg.id === regId) {
+        setProofModalReg({ ...proofModalReg, status: 'Rejected', paymentVerified: false });
+      }
+    } catch (err) {
+      setFeedback({ type: 'error', message: err.message || 'Failed to reject registration' });
+    }
+  };
+
+  const handleDeleteReg = async (regId) => {
+    if (!window.confirm(`Permanently delete registration ${regId}? This cannot be undone.`)) return;
+    try {
+      await apiFetch(`/registrations/${regId}`, { method: 'DELETE' });
+      setFeedback({ type: 'success', message: `Registration ${regId} permanently removed` });
+      fetchRegistrations();
+    } catch (err) {
+      setFeedback({ type: 'error', message: err.message || 'Failed to delete registration' });
+    }
+  };
+
+  const handleBatchVerifyRegs = async () => {
+    const pendingList = registrations.filter(r => !r.paymentVerified && r.status !== 'Rejected' && r.status !== 'Confirmed');
+    if (pendingList.length === 0) {
+      setFeedback({ type: 'info', message: 'No pending registrations to verify.' });
+      return;
+    }
+    if (!window.confirm(`Are you sure you want to approve and verify payments for all ${pendingList.length} pending registration(s)? This will unlock their gate passes.`)) return;
+    
+    try {
+      const res = await apiFetch('/registrations/batch-verify', {
+        method: 'POST',
+        body: JSON.stringify({
+          ids: pendingList.map(r => r.id),
+          adminName: currentUser.name
+        })
+      });
+      setFeedback({ type: 'success', message: res.message });
+      fetchRegistrations();
+    } catch (err) {
+      setFeedback({ type: 'error', message: err.message || 'Batch verification failed' });
+    }
+  };
+
+  const handleExcelImport = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        setImportingExcel(true);
+        const res = await apiFetch('/registrations/import-excel', {
+          method: 'POST',
+          body: JSON.stringify({ base64: event.target.result })
+        });
+        if (res.success) {
+          setFeedback({
+            type: 'success',
+            message: `✓ Excel Imported: ${res.imported} new registrations added, ${res.updated} updated!`
+          });
+          fetchRegistrations();
+        }
+      } catch (err) {
+        setFeedback({
+          type: 'error',
+          message: err.message || 'Failed to process Excel file'
+        });
+      } finally {
+        setImportingExcel(false);
+        e.target.value = '';
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const openActionPrompt = (type, id, action, title = '') => {
@@ -405,8 +523,8 @@ export default function AdminPortal({ currentUser }) {
           )}
         </div>
 
-        {/* REQUEST PORTAL TABS IN 3 DISTINCT SECTIONS + EXCEL EXPORT + DATA BACKUP */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 mt-6 pt-5 border-t border-slate-100">
+        {/* REQUEST PORTAL TABS IN 4 DISTINCT SECTIONS + EXCEL EXPORT + DATA BACKUP */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mt-6 pt-5 border-t border-slate-100">
           
           {/* Section 1: CORE TEAM */}
           <button
@@ -451,6 +569,21 @@ export default function AdminPortal({ currentUser }) {
             <span>3. PARTICIPANTS ({requestsData.participantRequests.filter(r => r.status === 'PENDING').length})</span>
           </button>
 
+          {/* Section 4: DELEGATE REGISTRATIONS & GATE PASSES */}
+          <button
+            onClick={() => { setActiveSection('REGISTRATIONS'); setFeedback(null); fetchRegistrations(); }}
+            className={`flex items-center justify-center gap-2 py-3 px-3 rounded-2xl font-bold text-xs transition-all border ${
+              activeSection === 'REGISTRATIONS'
+                ? 'bg-gradient-to-r from-[#0284C7] to-[#0369A1] text-white border-[#0284C7] shadow-xs'
+                : 'bg-[#92EEFF]/30 hover:bg-[#92EEFF]/50 text-sky-950 border-[#92EEFF]'
+            }`}
+          >
+            <Ticket className="w-4 h-4 text-[#006dae]" />
+            <span>
+              4. DELEGATE PASSES ({regStats.pending > 0 ? `${regStats.pending} PENDING` : regStats.total})
+            </span>
+          </button>
+
           {/* Excel Export Studio */}
           <button
             onClick={() => { setActiveSection('EXCEL_EXPORT'); setFeedback(null); }}
@@ -467,7 +600,7 @@ export default function AdminPortal({ currentUser }) {
           {/* Data Backup & Cloud */}
           <button
             onClick={() => { setActiveSection('BACKUP'); setFeedback(null); }}
-            className={`flex items-center justify-center gap-2 py-3 px-3 rounded-2xl font-bold text-xs transition-all border col-span-2 sm:col-span-1 ${
+            className={`flex items-center justify-center gap-2 py-3 px-3 rounded-2xl font-bold text-xs transition-all border ${
               activeSection === 'BACKUP'
                 ? 'bg-gradient-to-r from-sky-600 to-blue-700 text-white border-sky-600 shadow-xs'
                 : 'bg-sky-50 hover:bg-sky-100 text-sky-950 border-sky-200'
@@ -1028,7 +1161,413 @@ export default function AdminPortal({ currentUser }) {
         </div>
       )}
 
-      {/* EXCEL EXPORT STUDIO (DAILY EXCEL REPORT WITH DATE AND HRS) */}
+      {/* SECTION 4: DELEGATE REGISTRATIONS & GATE ENTRY PASSES */}
+      {activeSection === 'REGISTRATIONS' && (
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-6">
+          {/* Header */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase tracking-wider text-[#006dae] bg-[#92EEFF]/30 px-2.5 py-0.5 rounded-full border border-sky-300">
+                  ARENIUM 27 SYNCHRONIZED PORTAL • SECTION 4
+                </span>
+                <span className="text-[11px] font-bold text-emerald-700 bg-[#D8FFC5]/70 px-2.5 py-0.5 rounded-full border border-[#C4F7CA]">
+                  ● Live Sync Active
+                </span>
+              </div>
+              <h2 className="text-xl font-black text-slate-900 mt-1">
+                Delegate Registrations, Payment Proofs & Gate Passes
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Review delegate payments, approve UTR transactions to unlock official QR passes, import/export Excel sheets, and monitor gate check-in status.
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="file"
+                id="excel-reg-upload-input"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleExcelImport}
+                style={{ display: 'none' }}
+              />
+              <button
+                type="button"
+                onClick={() => document.getElementById('excel-reg-upload-input')?.click()}
+                disabled={importingExcel}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#30AFFF] text-white hover:bg-[#2090e0] transition-all shadow-xs cursor-pointer"
+                title="Import registrations from Excel file (.xlsx, .xls, .csv)"
+              >
+                <UploadCloud className={`w-3.5 h-3.5 ${importingExcel ? 'animate-bounce' : ''}`} />
+                <span>{importingExcel ? 'Importing...' : '📥 Import Excel'}</span>
+              </button>
+
+              <a
+                href={getRegistrationsExcelExportUrl()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#D8FFC5] text-emerald-950 hover:bg-[#c6f8af] border border-[#C4F7CA] transition-all shadow-2xs"
+                title="Export all delegate registrations with payment and gate status to Excel"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-700" />
+                <span>📤 Export Excel</span>
+              </a>
+
+              <button
+                type="button"
+                onClick={handleBatchVerifyRegs}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 transition-all cursor-pointer"
+                title="Verify all pending payment records at once"
+              >
+                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                <span>✓ Verify All Pending</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={fetchRegistrations}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer"
+                title="Sync with ARENIUM 27 database"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                <span>Sync</span>
+              </button>
+
+              <a
+                href="http://localhost:8000/register.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 transition-all"
+                title="View ARENIUM 27 Public Registration Site"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+                <span>Fest Site ↗</span>
+              </a>
+            </div>
+          </div>
+
+          {/* Quick Metrics Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-center shadow-2xs">
+              <div className="text-2xl font-black text-slate-900">{regStats.total}</div>
+              <div className="text-[10px] font-extrabold uppercase text-slate-500 mt-0.5">Total Delegates</div>
+            </div>
+            <div className="p-4 rounded-2xl bg-[#D8FFC5]/50 border border-[#C4F7CA] text-center shadow-2xs">
+              <div className="text-2xl font-black text-emerald-800">{regStats.verified}</div>
+              <div className="text-[10px] font-extrabold uppercase text-emerald-900 mt-0.5">Payment Verified (Passes Unlocked)</div>
+            </div>
+            <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-center shadow-2xs">
+              <div className="text-2xl font-black text-amber-600">{regStats.pending}</div>
+              <div className="text-[10px] font-extrabold uppercase text-amber-900 mt-0.5">Pending Payment Verification</div>
+            </div>
+            <div className="p-4 rounded-2xl bg-sky-50 border border-sky-200 text-center shadow-2xs">
+              <div className="text-2xl font-black text-[#006dae]">{regStats.checkedIn}</div>
+              <div className="text-[10px] font-extrabold uppercase text-sky-900 mt-0.5">Gate Checked In</div>
+            </div>
+          </div>
+
+          {/* Search & Filter Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search by Name, USN, UTR, Reg ID, College, Team..."
+                value={regSearch}
+                onChange={(e) => setRegSearch(e.target.value)}
+                className="w-full pl-9 pr-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#30AFFF]"
+              />
+            </div>
+
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[11px] font-bold text-slate-400 uppercase mr-1">Status:</span>
+              {[
+                { id: 'ALL', label: `All (${registrations.length})` },
+                { id: 'PENDING', label: `Pending (${regStats.pending})` },
+                { id: 'CONFIRMED', label: `Verified (${regStats.verified})` },
+                { id: 'CHECKED_IN', label: `Checked In (${regStats.checkedIn})` },
+                { id: 'REJECTED', label: `Rejected (${regStats.rejected})` }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setRegStatusFilter(tab.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    regStatusFilter === tab.id
+                      ? 'bg-slate-900 text-white shadow-2xs'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Registrations Data Table */}
+          <div className="overflow-x-auto rounded-2xl border border-slate-200 shadow-2xs">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-extrabold uppercase text-[10px] tracking-wider">
+                  <th className="py-3 px-3.5">Registration ID</th>
+                  <th className="py-3 px-3.5">Delegate Lead</th>
+                  <th className="py-3 px-3.5">College / USN</th>
+                  <th className="py-3 px-3.5">Competition Arenas</th>
+                  <th className="py-3 px-3.5">Fee &amp; UTR Ref</th>
+                  <th className="py-3 px-3.5">Payment Status</th>
+                  <th className="py-3 px-3.5 text-right">Admin Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {registrations
+                  .filter(r => {
+                    if (regStatusFilter !== 'ALL') {
+                      if (regStatusFilter === 'PENDING') {
+                        const isPend = !r.status || r.status === 'Pending Verification' || (!r.paymentVerified && r.status !== 'Rejected' && r.status !== 'Confirmed' && r.status !== 'Checked In');
+                        if (!isPend) return false;
+                      } else if (regStatusFilter === 'CONFIRMED') {
+                        if (r.status !== 'Confirmed' && !r.paymentVerified) return false;
+                      } else if (regStatusFilter === 'CHECKED_IN') {
+                        if (r.status !== 'Checked In' && !r.checkedIn) return false;
+                      } else if (regStatusFilter === 'REJECTED') {
+                        if (r.status !== 'Rejected') return false;
+                      }
+                    }
+                    if (regSearch) {
+                      const q = regSearch.toLowerCase().trim();
+                      const match = (
+                        (r.id && r.id.toLowerCase().includes(q)) ||
+                        (r.fullName && r.fullName.toLowerCase().includes(q)) ||
+                        (r.email && r.email.toLowerCase().includes(q)) ||
+                        (r.college && r.college.toLowerCase().includes(q)) ||
+                        (r.usn && r.usn.toLowerCase().includes(q)) ||
+                        (r.utrId && r.utrId.toLowerCase().includes(q)) ||
+                        (r.teamName && r.teamName.toLowerCase().includes(q))
+                      );
+                      if (!match) return false;
+                    }
+                    return true;
+                  })
+                  .map((reg) => {
+                    const isVerified = (reg.status === 'Confirmed' || reg.status === 'Checked In' || reg.paymentVerified);
+                    const isCheckedIn = (reg.status === 'Checked In' || reg.checkedIn);
+                    const isRejected = reg.status === 'Rejected';
+                    const isTeam = reg.regType === 'Team' || !!reg.teamName;
+
+                    return (
+                      <tr key={reg.id} className="hover:bg-slate-50/80 transition-colors">
+                        {/* ID */}
+                        <td className="py-3.5 px-3.5 font-mono">
+                          <span className="font-black text-[#006dae]">{reg.id}</span>
+                          <div className="text-[10px] text-slate-400 mt-0.5">
+                            {reg.timestamp ? new Date(reg.timestamp).toLocaleDateString() : 'Active'}
+                          </div>
+                        </td>
+
+                        {/* Delegate */}
+                        <td className="py-3.5 px-3.5">
+                          <div className="font-extrabold text-slate-900">{reg.fullName}</div>
+                          <div className="text-[11px] text-slate-500">{reg.email}</div>
+                          <div className="text-[10px] text-slate-400">📞 {reg.phone || 'N/A'}</div>
+                        </td>
+
+                        {/* College & USN */}
+                        <td className="py-3.5 px-3.5">
+                          <div className="font-bold text-slate-800 line-clamp-1">{reg.college || 'Presidency University'}</div>
+                          <div className="font-mono text-[11px] text-[#006dae] font-bold">{reg.usn || 'N/A'}</div>
+                          <span className={`inline-block mt-0.5 text-[9px] font-black uppercase px-1.5 py-0.2 rounded border ${
+                            reg.category === 'external'
+                              ? 'bg-purple-50 text-purple-700 border-purple-200'
+                              : 'bg-sky-50 text-sky-700 border-sky-200'
+                          }`}>
+                            {reg.category === 'external' ? 'EXTERNAL' : 'INTERNAL'}
+                          </span>
+                        </td>
+
+                        {/* Arenas & Team */}
+                        <td className="py-3.5 px-3.5">
+                          <div className="font-bold text-slate-900">
+                            1: {reg.event1Name || reg.eventName || 'Arena'}
+                          </div>
+                          {reg.event2Name && reg.event2Name !== '-' && (
+                            <div className="text-[11px] text-emerald-700 font-semibold">
+                              2: {reg.event2Name} (FREE)
+                            </div>
+                          )}
+                          {reg.event3Name && reg.event3Name !== '-' && (
+                            <div className="text-[11px] text-amber-700 font-semibold">
+                              3: {reg.event3Name} (+Fee)
+                            </div>
+                          )}
+                          <div className="text-[10px] text-slate-500 mt-1">
+                            {isTeam ? `👥 Squad: ${reg.teamName || 'Team'}` : '👤 Solo'}
+                          </div>
+                        </td>
+
+                        {/* Fee & UTR */}
+                        <td className="py-3.5 px-3.5">
+                          <div className="font-black text-emerald-700 text-sm">{reg.feePaid || '₹200'}</div>
+                          <code className="text-[11px] font-mono bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded border border-slate-200 font-bold block mt-0.5 w-fit">
+                            {reg.utrId || 'NO-UTR'}
+                          </code>
+                          {reg.paymentScreenshot ? (
+                            <button
+                              type="button"
+                              onClick={() => setProofModalReg(reg)}
+                              className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold text-[#006dae] hover:underline cursor-pointer"
+                            >
+                              <Eye className="w-3 h-3" />
+                              <span>View Proof</span>
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 italic block mt-1">No SS proof</span>
+                          )}
+                        </td>
+
+                        {/* Status Badge */}
+                        <td className="py-3.5 px-3.5">
+                          {isCheckedIn ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-sky-100 text-[#006dae] border border-sky-300">
+                              <CheckCircle2 className="w-3 h-3 text-[#006dae]" />
+                              CHECKED IN
+                            </span>
+                          ) : isVerified ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-[#D8FFC5] text-emerald-950 border border-[#C4F7CA]">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-700" />
+                              VERIFIED (PASS UNLOCKED)
+                            </span>
+                          ) : isRejected ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300">
+                              <XCircle className="w-3 h-3 text-rose-600" />
+                              REJECTED
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 animate-pulse">
+                              <Clock3 className="w-3 h-3 text-amber-600" />
+                              PENDING VERIFICATION
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Actions */}
+                        <td className="py-3.5 px-3.5 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {!isVerified && (
+                              <button
+                                type="button"
+                                onClick={() => handleVerifyPayment(reg.id)}
+                                className="px-2.5 py-1.5 rounded-xl text-[11px] font-black bg-[#D8FFC5] text-emerald-950 hover:bg-[#bbf69e] border border-[#C4F7CA] shadow-2xs transition-all cursor-pointer"
+                                title="Approve payment & unlock delegate entry pass"
+                              >
+                                ✓ Verify Payment
+                              </button>
+                            )}
+
+                            {!isRejected && (
+                              <button
+                                type="button"
+                                onClick={() => handleRejectPayment(reg.id)}
+                                className="px-2 py-1.5 rounded-xl text-[11px] font-bold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition-all cursor-pointer"
+                                title="Reject registration"
+                              >
+                                ✕
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteReg(reg.id)}
+                              className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-slate-100 transition-all cursor-pointer"
+                              title="Delete record"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+
+            {registrations.length === 0 && (
+              <div className="p-8 text-center text-slate-400 text-xs">
+                No delegate registrations found. Click "📥 Import Excel" or wait for students to register online.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Payment Screenshot Proof Modal */}
+      {proofModalReg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-2xs animate-in fade-in">
+          <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden space-y-4 p-6">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-[10px] font-black uppercase text-[#006dae] bg-[#30AFFF]/10 px-2 py-0.5 rounded-md">
+                  Payment Verification Proof
+                </span>
+                <h3 className="font-black text-base text-slate-900 mt-1">
+                  {proofModalReg.fullName} ({proofModalReg.id})
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setProofModalReg(null)}
+                className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-3 rounded-2xl border border-slate-200">
+              <div><strong className="text-slate-500 text-[10px] uppercase block">USN:</strong> {proofModalReg.usn}</div>
+              <div><strong className="text-slate-500 text-[10px] uppercase block">College:</strong> {proofModalReg.college}</div>
+              <div><strong className="text-slate-500 text-[10px] uppercase block">Amount Paid:</strong> <span className="font-black text-emerald-700">{proofModalReg.feePaid || '₹200'}</span></div>
+              <div><strong className="text-slate-500 text-[10px] uppercase block">UTR Reference:</strong> <code className="font-mono text-xs font-bold text-slate-800">{proofModalReg.utrId}</code></div>
+            </div>
+
+            {/* Image Preview */}
+            <div className="max-h-[360px] overflow-auto rounded-2xl border border-slate-200 bg-slate-950 flex items-center justify-center p-2">
+              {proofModalReg.paymentScreenshot ? (
+                <img
+                  src={proofModalReg.paymentScreenshot}
+                  alt="Payment Proof"
+                  className="max-h-[340px] w-auto object-contain rounded-xl"
+                />
+              ) : (
+                <div className="text-slate-400 text-xs p-6 text-center">No image attachment uploaded</div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+              <span className="text-xs font-bold">
+                Status: <span className="text-[#006dae]">{proofModalReg.status || 'Pending'}</span>
+              </span>
+
+              <div className="flex gap-2">
+                {(!proofModalReg.paymentVerified && proofModalReg.status !== 'Confirmed') && (
+                  <button
+                    type="button"
+                    onClick={() => handleVerifyPayment(proofModalReg.id)}
+                    className="px-4 py-2 text-xs font-black bg-[#D8FFC5] text-emerald-950 hover:bg-[#bbf69e] rounded-xl border border-[#C4F7CA] shadow-xs cursor-pointer"
+                  >
+                    ✓ Approve &amp; Verify Payment
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setProofModalReg(null)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {activeSection === 'EXCEL_EXPORT' && (
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">

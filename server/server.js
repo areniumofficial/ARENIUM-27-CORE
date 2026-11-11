@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
 const { connectDB, readDB, writeDB, initDB, resetToRealData, restoreFromBackup, getStorageMode } = require('./db');
-const { generateODExcel } = require('./excel');
+const { generateODExcel, generateRegistrationsExcel, parseRegistrationsExcel } = require('./excel');
 
 // Eager initialization of DB connection
 initDB().catch(err => console.warn('[ARENIUM API] Startup DB init note:', err.message));
@@ -12,7 +12,8 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // API route compatibility: handles requests whether proxy preserves or strips /api
 app.use((req, res, next) => {
@@ -511,6 +512,38 @@ app.get('/api/volunteer/lookup', async (req, res) => {
     });
   });
 
+  // Also search through Delegate Registrations & Excel Imports
+  const registrations = db.registrations || [];
+  registrations.forEach(r => {
+    const isMatch = (
+      (r.fullName && r.fullName.toLowerCase().includes(query)) ||
+      (r.usn && r.usn.toLowerCase().includes(query)) ||
+      (r.id && r.id.toLowerCase().includes(query)) ||
+      (r.teamName && r.teamName.toLowerCase().includes(query)) ||
+      (r.utrId && r.utrId.toLowerCase().includes(query))
+    );
+
+    if (isMatch && !matchingMembers.some(m => m.rollNumber && r.usn && m.rollNumber.toLowerCase() === r.usn.toLowerCase())) {
+      const isPaid = (r.paymentVerified || r.status === 'Confirmed' || r.status === 'Checked In');
+      matchingMembers.push({
+        id: r.id,
+        regId: r.id,
+        name: r.fullName,
+        rollNumber: r.usn || r.id,
+        section: r.department || 'Delegate',
+        batchNumber: r.yearSem || '2024-27',
+        schoolName: r.college || 'Presidency University',
+        teamName: r.teamName || 'Solo Delegate',
+        teamVerified: isPaid,
+        paymentVerified: isPaid,
+        status: r.status,
+        feePaid: r.feePaid,
+        utrId: r.utrId,
+        isRegistration: true
+      });
+    }
+  });
+
   res.json({
     teams: matchingTeams,
     members: matchingMembers
@@ -668,6 +701,12 @@ app.get('/api/admin/overview', async (req, res) => {
 
   const totalApproved = odRequests.filter(r => r.status === 'APPROVED').length;
 
+  const registrations = db.registrations || [];
+  const totalRegistrations = registrations.length;
+  const verifiedRegistrations = registrations.filter(r => r.status === 'Confirmed' || r.status === 'Checked In' || r.paymentVerified).length;
+  const pendingRegistrations = registrations.filter(r => !r.status || r.status === 'Pending Verification' || (!r.paymentVerified && r.status !== 'Rejected' && r.status !== 'Confirmed' && r.status !== 'Checked In')).length;
+  const checkedInRegistrations = registrations.filter(r => r.checkedIn || r.status === 'Checked In').length;
+
   res.json({
     totalCoreRequests,
     totalVolunteerScans,
@@ -680,6 +719,10 @@ app.get('/api/admin/overview', async (req, res) => {
     verifiedTeams: teams.filter(t => t.verified).length,
     totalVolunteers: volunteers.length,
     approvedVolunteers: volunteers.filter(v => v.status === 'APPROVED').length,
+    totalRegistrations,
+    verifiedRegistrations,
+    pendingRegistrations,
+    checkedInRegistrations,
     storageMode: getStorageMode()
   });
 });
@@ -929,6 +972,585 @@ app.post('/api/admin/restore-backup', async (req, res) => {
 app.post('/api/system/reset-demo', async (req, res) => {
   const db = await resetToRealData();
   res.json({ success: true, message: 'Database reset to clean real state' });
+});
+
+// ==========================================
+// REGISTRATION ENGINE & GATE SCANNER SYNC
+// ==========================================
+
+// 1. Get all registrations (with filters & stats)
+app.get('/api/registrations', async (req, res) => {
+  const db = await readDB();
+  let list = db.registrations || [];
+  const { status, event, search, limit } = req.query;
+
+  if (status && status !== 'ALL') {
+    list = list.filter(r => r.status === status || (status === 'Confirmed' && r.paymentVerified));
+  }
+  if (event && event !== 'ALL') {
+    list = list.filter(r => r.eventId === event || r.event1Id === event || (r.eventName && r.eventName.toLowerCase().includes(event.toLowerCase())));
+  }
+  if (search) {
+    const q = search.toLowerCase().trim();
+    list = list.filter(r => 
+      (r.id && r.id.toLowerCase().includes(q)) ||
+      (r.fullName && r.fullName.toLowerCase().includes(q)) ||
+      (r.email && r.email.toLowerCase().includes(q)) ||
+      (r.college && r.college.toLowerCase().includes(q)) ||
+      (r.usn && r.usn.toLowerCase().includes(q)) ||
+      (r.utrId && r.utrId.toLowerCase().includes(q)) ||
+      (r.teamName && r.teamName.toLowerCase().includes(q))
+    );
+  }
+
+  const allRegs = db.registrations || [];
+  const stats = {
+    total: allRegs.length,
+    verified: allRegs.filter(r => r.status === 'Confirmed' || r.status === 'Checked In' || r.paymentVerified).length,
+    pending: allRegs.filter(r => !r.status || r.status === 'Pending Verification' || (!r.paymentVerified && r.status !== 'Rejected' && r.status !== 'Confirmed' && r.status !== 'Checked In')).length,
+    checkedIn: allRegs.filter(r => r.checkedIn || r.status === 'Checked In').length,
+    rejected: allRegs.filter(r => r.status === 'Rejected').length
+  };
+
+  const parsedLimit = parseInt(limit, 10);
+  if (!isNaN(parsedLimit) && parsedLimit > 0) {
+    list = list.slice(0, parsedLimit);
+  }
+
+  res.json({
+    registrations: list,
+    stats
+  });
+});
+
+// 2. Submit new student registration (Defaults to 'Pending Verification')
+app.post('/api/registrations', async (req, res) => {
+  const regData = req.body;
+  if (!regData || !regData.fullName) {
+    return res.status(400).json({ error: 'Participant name and details are required' });
+  }
+
+  const db = await readDB();
+  if (!Array.isArray(db.registrations)) db.registrations = [];
+
+  const regId = regData.id || `ARENIUM27-REG-${Math.floor(1000 + Math.random() * 9000)}`;
+  const isVerified = (regData.status === 'Confirmed' || regData.status === 'Checked In' || regData.paymentVerified === true);
+
+  const newReg = {
+    ...regData,
+    id: regId,
+    status: isVerified ? 'Confirmed' : (regData.status || 'Pending Verification'),
+    paymentVerified: isVerified,
+    paymentVerifiedAt: isVerified ? (regData.paymentVerifiedAt || new Date().toISOString()) : null,
+    paymentVerifiedBy: isVerified ? (regData.paymentVerifiedBy || 'Admin') : null,
+    checkedIn: regData.status === 'Checked In',
+    checkedInAt: regData.status === 'Checked In' ? new Date().toISOString() : null,
+    timestamp: regData.timestamp || new Date().toISOString()
+  };
+
+  // Upsert if ID or USN already exists
+  const existingIndex = db.registrations.findIndex(r => r.id === regId || (r.usn && regData.usn && r.usn.toLowerCase() === regData.usn.toLowerCase()));
+  if (existingIndex >= 0) {
+    db.registrations[existingIndex] = { ...db.registrations[existingIndex], ...newReg };
+  } else {
+    db.registrations.unshift(newReg);
+  }
+
+  await writeDB(db);
+
+  res.json({
+    success: true,
+    message: isVerified 
+      ? 'Registration confirmed and verified!' 
+      : 'Registration submitted! Payment proof is pending admin verification before pass is unlocked.',
+    registration: newReg
+  });
+});
+
+// 3. Student Pass Lookup (By Registration ID, USN, or Email)
+// Enforces: Pass is only unlocked if payment is verified by admin!
+app.get('/api/registrations/lookup/:query', async (req, res) => {
+  const query = (req.params.query || '').trim().toLowerCase();
+  if (!query) {
+    return res.status(400).json({ error: 'Search query is required' });
+  }
+
+  const db = await readDB();
+  const list = db.registrations || [];
+
+  const reg = list.find(r => 
+    (r.id && r.id.toLowerCase() === query) ||
+    (r.usn && r.usn.toLowerCase() === query) ||
+    (r.email && r.email.toLowerCase() === query) ||
+    (r.utrId && r.utrId.toLowerCase() === query)
+  );
+
+  if (!reg) {
+    return res.status(404).json({
+      found: false,
+      error: 'No registration record found for: ' + req.params.query
+    });
+  }
+
+  const isVerified = (reg.status === 'Confirmed' || reg.status === 'Checked In' || reg.paymentVerified);
+
+  if (reg.status === 'Rejected') {
+    return res.json({
+      found: true,
+      verified: false,
+      passUnlocked: false,
+      status: 'Rejected',
+      message: 'Registration / Payment verification was marked as REJECTED. Please contact fest administration.',
+      registration: {
+        id: reg.id,
+        fullName: reg.fullName,
+        college: reg.college,
+        usn: reg.usn,
+        status: 'Rejected',
+        feePaid: reg.feePaid
+      }
+    });
+  }
+
+  if (!isVerified) {
+    // Payment Pending: Return public summary but DO NOT unlock full pass QR
+    return res.json({
+      found: true,
+      verified: false,
+      passUnlocked: false,
+      status: 'Pending Verification',
+      message: 'Your registration is received, but payment (UTR: ' + (reg.utrId || 'N/A') + ') is currently under verification by the admin. Your official delegate entry pass & QR code will unlock once payment is approved.',
+      registration: {
+        id: reg.id,
+        fullName: reg.fullName,
+        college: reg.college,
+        usn: reg.usn,
+        eventName: reg.eventName || reg.event1Name,
+        event1Name: reg.event1Name || reg.eventName,
+        event2Name: reg.event2Name || '',
+        event3Name: reg.event3Name || '',
+        feePaid: reg.feePaid,
+        utrId: reg.utrId,
+        regType: reg.regType,
+        teamName: reg.teamName,
+        status: 'Pending Verification',
+        timestamp: reg.timestamp
+      }
+    });
+  }
+
+  // Payment is Verified: Return full unlocked pass payload
+  res.json({
+    found: true,
+    verified: true,
+    passUnlocked: true,
+    status: reg.status,
+    message: 'Payment verified! Official Delegate Gate Pass is unlocked and valid for entry.',
+    registration: reg
+  });
+});
+
+// 4. Verify Registration Payment (Admin Approval)
+app.post('/api/registrations/:id/verify-payment', async (req, res) => {
+  const { id } = req.params;
+  const { adminName } = req.body;
+
+  const db = await readDB();
+  if (!Array.isArray(db.registrations)) db.registrations = [];
+
+  const reg = db.registrations.find(r => r.id === id);
+  if (!reg) {
+    return res.status(404).json({ error: 'Registration not found' });
+  }
+
+  reg.status = 'Confirmed';
+  reg.paymentVerified = true;
+  reg.paymentVerifiedAt = new Date().toISOString();
+  reg.paymentVerifiedBy = adminName || 'Admin';
+
+  await writeDB(db);
+
+  res.json({
+    success: true,
+    message: `Payment for ${reg.fullName} (${reg.id}) verified successfully! Entry pass unlocked for student.`,
+    registration: reg
+  });
+});
+
+// 5. Reject Registration Payment (Admin Action)
+app.post('/api/registrations/:id/reject-payment', async (req, res) => {
+  const { id } = req.params;
+  const { reason, adminName } = req.body;
+
+  const db = await readDB();
+  if (!Array.isArray(db.registrations)) db.registrations = [];
+
+  const reg = db.registrations.find(r => r.id === id);
+  if (!reg) {
+    return res.status(404).json({ error: 'Registration not found' });
+  }
+
+  reg.status = 'Rejected';
+  reg.paymentVerified = false;
+  reg.rejectReason = reason || 'Payment transaction verification failed';
+  reg.rejectedAt = new Date().toISOString();
+  reg.rejectedBy = adminName || 'Admin';
+
+  await writeDB(db);
+
+  res.json({
+    success: true,
+    message: `Registration ${reg.id} marked as rejected.`,
+    registration: reg
+  });
+});
+
+// 6. Delete Registration
+app.delete('/api/registrations/:id', async (req, res) => {
+  const { id } = req.params;
+  const db = await readDB();
+  if (!Array.isArray(db.registrations)) db.registrations = [];
+
+  const prevLen = db.registrations.length;
+  db.registrations = db.registrations.filter(r => r.id !== id);
+
+  if (db.registrations.length === prevLen) {
+    return res.status(404).json({ error: 'Registration not found' });
+  }
+
+  await writeDB(db);
+  res.json({ success: true, message: `Registration ${id} deleted.` });
+});
+
+// 7. Batch Verify Payments
+app.post('/api/registrations/batch-verify', async (req, res) => {
+  const { ids, adminName } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'No registration IDs supplied' });
+  }
+
+  const db = await readDB();
+  if (!Array.isArray(db.registrations)) db.registrations = [];
+
+  let count = 0;
+  db.registrations.forEach(r => {
+    if (ids.includes(r.id)) {
+      r.status = 'Confirmed';
+      r.paymentVerified = true;
+      r.paymentVerifiedAt = new Date().toISOString();
+      r.paymentVerifiedBy = adminName || 'Admin Batch';
+      count++;
+    }
+  });
+
+  await writeDB(db);
+  res.json({
+    success: true,
+    message: `Successfully verified payments for ${count} registrations!`,
+    count
+  });
+});
+
+// 8. UNIFIED GATE SCANNER VERIFICATION
+// Scans delegate pass, verifies payment approval, and checks participant into festival
+app.post('/api/registrations/scan', async (req, res) => {
+  const { qrData, volunteerId, volunteerName, scannerSource } = req.body;
+  if (!qrData) {
+    return res.status(400).json({ cleared: false, error: 'No QR data provided' });
+  }
+
+  const raw = String(qrData).trim();
+  const db = await readDB();
+  if (!Array.isArray(db.registrations)) db.registrations = [];
+  if (!Array.isArray(db.scanLogs)) db.scanLogs = [];
+
+  // 1. Try to extract Registration ID or Roll No
+  let targetId = null;
+  const idMatch = raw.match(/ARENIUM27-REG-[0-9]+/i) || raw.match(/AR27-[A-Z0-9-]+/i) || raw.match(/TEST-[A-Z0-9-]+/i);
+  if (idMatch) {
+    targetId = idMatch[0].toUpperCase();
+  }
+
+  // 2. Try JSON parsing
+  let jsonPayload = null;
+  try {
+    jsonPayload = JSON.parse(raw);
+    if (jsonPayload.regId) targetId = jsonPayload.regId.toUpperCase();
+    if (jsonPayload.id && String(jsonPayload.id).startsWith('ARENIUM')) targetId = jsonPayload.id.toUpperCase();
+  } catch (_) {}
+
+  // 3. Find registration in unified database
+  let matchedReg = db.registrations.find(r => 
+    (targetId && r.id && r.id.toUpperCase() === targetId) ||
+    (r.id && r.id.toUpperCase() === raw.toUpperCase()) ||
+    (r.usn && r.usn.toUpperCase() === raw.toUpperCase()) ||
+    (r.utrId && r.utrId.toUpperCase() === raw.toUpperCase()) ||
+    (jsonPayload && jsonPayload.rollNumber && r.usn && r.usn.toUpperCase() === jsonPayload.rollNumber.toUpperCase()) ||
+    (r.fullName && r.fullName.toUpperCase() === raw.toUpperCase())
+  );
+
+  // If not found in registrations, also check if it's a team name
+  if (!matchedReg) {
+    matchedReg = db.registrations.find(r => r.teamName && r.teamName.toLowerCase() === raw.toLowerCase());
+  }
+
+  if (!matchedReg) {
+    // Log unsuccessful scan
+    db.scanLogs.unshift({
+      id: generateId('scan'),
+      volunteerId: volunteerId || 'scanner',
+      volunteerName: volunteerName || 'Gate Scanner',
+      scanType: 'UNREGISTERED_PASS',
+      timestamp: new Date().toISOString(),
+      details: `Unregistered barcode scanned: ${raw.slice(0, 100)}`
+    });
+    await writeDB(db);
+
+    return res.status(404).json({
+      cleared: false,
+      error: 'NOT_FOUND',
+      message: '⚠️ UNREGISTERED PASS: No matching registration found in ARENIUM 27 database.'
+    });
+  }
+
+  // PAYMENT VERIFICATION CHECK:
+  const isVerified = (matchedReg.status === 'Confirmed' || matchedReg.status === 'Checked In' || matchedReg.paymentVerified);
+
+  if (!isVerified) {
+    const isRejected = matchedReg.status === 'Rejected';
+    return res.status(403).json({
+      cleared: false,
+      error: isRejected ? 'PAYMENT_REJECTED' : 'PAYMENT_NOT_VERIFIED',
+      message: isRejected 
+        ? `🛑 ACCESS DENIED: Registration for ${matchedReg.fullName} was REJECTED by fest admin!` 
+        : `⚠️ ACCESS DENIED: Payment for ${matchedReg.fullName} (UTR: ${matchedReg.utrId || 'N/A'}) has NOT been verified by Admin yet! Direct delegate to Admin Registration Desk.`,
+      registration: matchedReg
+    });
+  }
+
+  // Payment is verified! Check-in gate pass
+  const wasAlreadyCheckedIn = (matchedReg.status === 'Checked In' || matchedReg.checkedIn);
+  matchedReg.status = 'Checked In';
+  matchedReg.checkedIn = true;
+  if (!matchedReg.checkedInAt) {
+    matchedReg.checkedInAt = new Date().toISOString();
+    matchedReg.checkedInBy = volunteerName ? `${volunteerName} (${volunteerId || 'Vol'})` : 'Gate Terminal Scanner';
+  }
+
+  // Log scan event
+  db.scanLogs.unshift({
+    id: generateId('scan'),
+    volunteerId: volunteerId || 'scanner',
+    volunteerName: volunteerName || 'Gate Scanner',
+    scanType: 'GATE_ENTRY_PASS',
+    regId: matchedReg.id,
+    participantName: matchedReg.fullName,
+    teamName: matchedReg.teamName,
+    timestamp: new Date().toISOString(),
+    details: `${wasAlreadyCheckedIn ? 'Repeat scan for' : 'Admitted'} ${matchedReg.fullName} (${matchedReg.regType || 'Solo'}) - Arenas: ${matchedReg.event1Name || matchedReg.eventName || 'Arenas'}`
+  });
+
+  // Automatically sync admitted students into the Daily OD Attendance roster for the official Excel Report
+  if (!Array.isArray(db.odRequests)) db.odRequests = [];
+  const todayDate = new Date().toISOString().slice(0, 10);
+  const studentsToRecord = [];
+
+  // Add registered delegate / team lead
+  if (matchedReg.usn) {
+    studentsToRecord.push({
+      name: matchedReg.fullName || 'Delegate',
+      usn: matchedReg.usn,
+      section: matchedReg.department || 'Fest Participant',
+      batch: matchedReg.yearSem || 'Batch 2024-27',
+      school: matchedReg.college || 'Presidency University'
+    });
+  }
+
+  // Add any team members if this is a team registration
+  if (Array.isArray(matchedReg.teamMembersList)) {
+    matchedReg.teamMembersList.forEach(m => {
+      if (m.usn && !studentsToRecord.some(s => s.usn.toLowerCase() === m.usn.toLowerCase())) {
+        studentsToRecord.push({
+          name: m.name || 'Team Member',
+          usn: m.usn,
+          section: matchedReg.department || 'Fest Participant',
+          batch: matchedReg.yearSem || 'Batch 2024-27',
+          school: matchedReg.college || 'Presidency University'
+        });
+      }
+    });
+  }
+
+  studentsToRecord.forEach((st, sIdx) => {
+    const existingOD = db.odRequests.find(od =>
+      od.date === todayDate &&
+      od.rollNumber &&
+      od.rollNumber.toLowerCase() === st.usn.toLowerCase()
+    );
+
+    if (!existingOD) {
+      db.odRequests.unshift({
+        id: `od-gate-${matchedReg.id}-${sIdx + 1}`,
+        requestType: 'PARTICIPANT',
+        targetId: matchedReg.id,
+        name: st.name,
+        rollNumber: st.usn,
+        section: st.section,
+        batchNumber: st.batch,
+        schoolName: st.school,
+        hodName: 'Dr. VMS / Dr. Vettermani',
+        teamName: matchedReg.teamName || 'ARENIUM DELEGATE',
+        date: todayDate,
+        hours: [1, 2, 3, 4, 5, 6, 7, 8],
+        hoursFormatted: 'Hour 1, Hour 2, Hour 3, Hour 4, Hour 5, Hour 6, Hour 7, Hour 8',
+        reason: `Festival Delegate Attendance Verified at Gate Scanner (${matchedReg.event1Name || matchedReg.eventName || 'Arena'})`,
+        status: 'APPROVED',
+        adminRemark: 'Auto-verified via Gate Terminal Pass Verification',
+        reviewedBy: volunteerName || 'Gate Scanner',
+        reviewedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString()
+      });
+    } else if (existingOD.status !== 'APPROVED') {
+      existingOD.status = 'APPROVED';
+      existingOD.reviewedBy = volunteerName || 'Gate Scanner';
+      existingOD.reviewedAt = new Date().toISOString();
+      existingOD.adminRemark = 'Auto-approved via Gate Terminal Scan';
+    }
+  });
+
+  await writeDB(db);
+
+  res.json({
+    cleared: true,
+    alreadyCheckedIn: wasAlreadyCheckedIn,
+    status: 'Checked In',
+    message: wasAlreadyCheckedIn 
+      ? `ℹ️ ALREADY CHECKED IN: ${matchedReg.fullName} cleared at ${new Date(matchedReg.checkedInAt).toLocaleTimeString()}` 
+      : `✅ ACCESS GRANTED: ${matchedReg.fullName} (${matchedReg.regType || 'Solo'}) checked in!`,
+    registration: matchedReg
+  });
+});
+
+// 9. IMPORT REGISTRATIONS FROM EXCEL (.xlsx / .xls / .csv)
+app.post('/api/registrations/import-excel', async (req, res) => {
+  const rawBase64 = req.body.base64 || req.body.fileBase64;
+  const records = req.body.records;
+  const db = await readDB();
+  if (!Array.isArray(db.registrations)) db.registrations = [];
+
+  let parsedRecords = [];
+
+  try {
+    if (rawBase64) {
+      const result = parseRegistrationsExcel(rawBase64);
+      parsedRecords = result.records || [];
+    } else if (Array.isArray(records)) {
+      parsedRecords = records;
+    } else {
+      return res.status(400).json({ error: 'Please provide either base64 Excel file string or parsed records array' });
+    }
+
+    if (parsedRecords.length === 0) {
+      return res.status(400).json({ error: 'No valid registration rows found in Excel sheet' });
+    }
+
+    let importedCount = 0;
+    let updatedCount = 0;
+
+    parsedRecords.forEach(row => {
+      const rowId = row.id || `ARENIUM27-REG-${Math.floor(1000 + Math.random() * 9000)}`;
+      row.id = rowId;
+
+      // Find existing by ID or USN
+      const idx = db.registrations.findIndex(r => 
+        (r.id && r.id.toLowerCase() === rowId.toLowerCase()) ||
+        (r.usn && row.usn && r.usn.toLowerCase() === row.usn.toLowerCase())
+      );
+
+      if (idx >= 0) {
+        // Merge, preserving screenshot if exists
+        const prev = db.registrations[idx];
+        db.registrations[idx] = {
+          ...prev,
+          ...row,
+          paymentScreenshot: row.paymentScreenshot || prev.paymentScreenshot || ''
+        };
+        updatedCount++;
+      } else {
+        db.registrations.unshift(row);
+        importedCount++;
+      }
+    });
+
+    await writeDB(db);
+
+    res.json({
+      success: true,
+      message: `Successfully processed Excel! ${importedCount} new registrations added, ${updatedCount} records updated.`,
+      total: parsedRecords.length,
+      imported: importedCount,
+      updated: updatedCount,
+      stats: {
+        totalRegistrations: db.registrations.length,
+        verified: db.registrations.filter(r => r.status === 'Confirmed' || r.status === 'Checked In' || r.paymentVerified).length
+      }
+    });
+  } catch (err) {
+    console.error('Excel Import Error:', err);
+    res.status(500).json({ error: 'Failed to process Excel file: ' + err.message });
+  }
+});
+
+// 10. EXPORT REGISTRATIONS AS EXCEL (.xlsx)
+app.get('/api/registrations/export-excel', async (req, res) => {
+  try {
+    const db = await readDB();
+    const list = db.registrations || [];
+    const buffer = generateRegistrationsExcel(list);
+
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const filename = `ARENIUM27_Registrations_${dateStr}.xlsx`;
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', buffer.length);
+    res.end(buffer);
+  } catch (err) {
+    console.error('Excel Export Error:', err);
+    res.status(500).json({ error: 'Failed to export Excel report: ' + err.message });
+  }
+});
+
+// 11. BIDIRECTIONAL SYNC WITH FESTDB (ARENIUM 27 Website)
+app.post('/api/sync/registrations', async (req, res) => {
+  const incomingList = req.body.clientRegistrations || req.body.registrations;
+  const db = await readDB();
+  if (!Array.isArray(db.registrations)) db.registrations = [];
+
+  if (Array.isArray(incomingList)) {
+    incomingList.forEach(clientReg => {
+      const idx = db.registrations.findIndex(r => r.id === clientReg.id || (r.usn && clientReg.usn && r.usn.toLowerCase() === clientReg.usn.toLowerCase()));
+      if (idx >= 0) {
+        // If client record is newer or has verified payment, merge
+        db.registrations[idx] = {
+          ...db.registrations[idx],
+          ...clientReg,
+          paymentScreenshot: clientReg.paymentScreenshot || db.registrations[idx].paymentScreenshot || ''
+        };
+      } else {
+        db.registrations.unshift(clientReg);
+      }
+    });
+    await writeDB(db);
+  }
+
+  res.json({
+    success: true,
+    serverRegistrations: db.registrations,
+    registrations: db.registrations,
+    total: db.registrations.length,
+    verifiedCount: db.registrations.filter(r => r.paymentVerified || r.status === 'Confirmed' || r.status === 'Checked In').length
+  });
 });
 
 if (require.main === module) {

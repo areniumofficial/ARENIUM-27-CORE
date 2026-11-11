@@ -58,6 +58,21 @@ export default function VolunteerPortal({ currentUser }) {
       payload = { raw: scannedRaw };
     }
 
+    // Check if this is an ARENIUM 27 Delegate Gate Pass
+    const rawStr = String(scannedRaw);
+    const isDelegatePass = (
+      scannerMode === 'GATE_PASS' ||
+      rawStr.includes('ARENIUM27-REG-') ||
+      rawStr.includes('OFFICIAL GATE PASS') ||
+      rawStr.includes('DELEGATE PASS') ||
+      (payload && (payload.type === 'ARENIUM_PASS' || payload.regId))
+    );
+
+    if (isDelegatePass) {
+      await verifyGatePass(scannedRaw);
+      return;
+    }
+
     if (scannerMode === 'TEAM') {
       const teamName = payload.teamName || (payload.type === 'ARENIUM_TEAM' ? payload.teamName : payload.raw);
       await verifyTeam(teamName, payload.teamId);
@@ -72,6 +87,36 @@ export default function VolunteerPortal({ currentUser }) {
       } else {
         handleDirectLookup(scannedRaw);
       }
+    }
+  };
+
+  const verifyGatePass = async (qrData) => {
+    setLoading(true);
+    try {
+      const res = await apiFetch('/registrations/scan', {
+        method: 'POST',
+        body: JSON.stringify({
+          qrData,
+          volunteerId: currentUser.id,
+          volunteerName: currentUser.name,
+          scannerSource: 'VOLUNTEER_PORTAL'
+        })
+      });
+
+      if (res.cleared) {
+        setFeedback({
+          type: 'success',
+          message: `${res.message} • Lead: ${res.registration?.fullName} (${res.registration?.usn || 'N/A'}) • Arenas: ${res.registration?.event1Name || res.registration?.eventName || 'General'}`
+        });
+        fetchActivity();
+      }
+    } catch (err) {
+      setFeedback({
+        type: 'error',
+        message: err.message || '⚠️ Gate pass verification failed or payment is unverified!'
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -221,21 +266,29 @@ export default function VolunteerPortal({ currentUser }) {
         </div>
 
         {/* Quick Action Buttons for Scanners */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6 pt-5 border-t border-slate-100">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 pt-5 border-t border-slate-100">
           <button
-            onClick={() => handleOpenScanner('PARTICIPANT')}
-            className="flex items-center justify-center gap-2.5 py-3.5 px-5 rounded-2xl font-bold text-xs uppercase tracking-wide bg-gradient-to-r from-[#30AFFF] to-[#2598e0] text-white hover:brightness-105 shadow-sm shadow-[#30AFFF]/25 transition-all cursor-pointer"
+            onClick={() => handleOpenScanner('GATE_PASS')}
+            className="flex items-center justify-center gap-2 py-3 px-3 rounded-2xl font-bold text-xs uppercase tracking-wide bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:brightness-105 shadow-sm shadow-emerald-500/25 transition-all cursor-pointer"
           >
             <Camera className="w-4 h-4" />
-            <span>Scan Participant QR (Allot Hourly Attendance)</span>
+            <span>🎫 Scan Gate Pass (ARENIUM 27)</span>
+          </button>
+
+          <button
+            onClick={() => handleOpenScanner('PARTICIPANT')}
+            className="flex items-center justify-center gap-2 py-3 px-3 rounded-2xl font-bold text-xs uppercase tracking-wide bg-gradient-to-r from-[#30AFFF] to-[#2598e0] text-white hover:brightness-105 shadow-sm shadow-[#30AFFF]/25 transition-all cursor-pointer"
+          >
+            <Camera className="w-4 h-4" />
+            <span>Participant Attendance</span>
           </button>
 
           <button
             onClick={() => handleOpenScanner('TEAM')}
-            className="flex items-center justify-center gap-2.5 py-3.5 px-5 rounded-2xl font-bold text-xs uppercase tracking-wide bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-200 shadow-2xs transition-all cursor-pointer"
+            className="flex items-center justify-center gap-2 py-3 px-3 rounded-2xl font-bold text-xs uppercase tracking-wide bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-200 shadow-2xs transition-all cursor-pointer"
           >
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>Scan Team QR (Verify Team Registration)</span>
+            <span>Team Verification QR</span>
           </button>
         </div>
       </div>
