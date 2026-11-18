@@ -121,10 +121,10 @@
         "name": "Ashlin Siddharth",
         "role": "CORE_TEAM"
       },
-      "status": "PENDING",
-      "adminRemark": "",
-      "reviewedBy": null,
-      "reviewedAt": null,
+      "status": "REJECTED",
+      "adminRemark": "Batch rejected by Admin Supervisor",
+      "reviewedBy": "Abhyas Kathuria",
+      "reviewedAt": "2026-11-11T14:20:35.550Z",
       "createdAt": "2026-11-05T04:30:00.000Z"
     },
     {
@@ -153,10 +153,10 @@
         "name": "Vimal Raj",
         "role": "CORE_TEAM"
       },
-      "status": "PENDING",
-      "adminRemark": "",
-      "reviewedBy": null,
-      "reviewedAt": null,
+      "status": "REJECTED",
+      "adminRemark": "Rejected per regulations",
+      "reviewedBy": "Abhyas Kathuria",
+      "reviewedAt": "2026-11-11T14:20:26.929Z",
       "createdAt": "2026-11-05T04:31:00.000Z"
     },
     {
@@ -187,10 +187,10 @@
         "name": "Kaushal Singh",
         "role": "CORE_TEAM"
       },
-      "status": "PENDING",
-      "adminRemark": "",
-      "reviewedBy": null,
-      "reviewedAt": null,
+      "status": "APPROVED",
+      "adminRemark": "Approved by Admin",
+      "reviewedBy": "Abhyas Kathuria",
+      "reviewedAt": "2026-11-11T14:20:22.225Z",
       "createdAt": "2026-11-05T04:32:00.000Z"
     },
     {
@@ -219,10 +219,10 @@
         "name": "Abhyas Kathuria",
         "role": "CORE_TEAM"
       },
-      "status": "PENDING",
-      "adminRemark": "",
-      "reviewedBy": null,
-      "reviewedAt": null,
+      "status": "APPROVED",
+      "adminRemark": "Approved by Admin",
+      "reviewedBy": "Abhyas Kathuria",
+      "reviewedAt": "2026-11-11T14:20:19.579Z",
       "createdAt": "2026-11-04T12:00:00.000Z"
     }
   ],
