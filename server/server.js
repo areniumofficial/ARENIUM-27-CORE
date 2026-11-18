@@ -1553,6 +1553,38 @@ app.post('/api/sync/registrations', async (req, res) => {
   });
 });
 
+// 12. CENTRALIZED CLOUD SYNC FOR FEST CONFIG, EVENTS & SETTINGS ACROSS ALL DEVICES
+app.get(['/api/fest-config', '/fest-config'], async (req, res) => {
+  try {
+    const db = await readDB();
+    res.json({
+      success: true,
+      festConfig: db.festConfig || null,
+      updatedAt: db.festConfigUpdatedAt || null
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post(['/api/fest-config', '/fest-config'], async (req, res) => {
+  try {
+    const db = await readDB();
+    const incomingConfig = req.body.festConfig || req.body;
+    db.festConfig = incomingConfig;
+    db.festConfigUpdatedAt = new Date().toISOString();
+    await writeDB(db);
+    res.json({
+      success: true,
+      message: 'Fest configuration updated across all devices.',
+      festConfig: db.festConfig,
+      updatedAt: db.festConfigUpdatedAt
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 if (require.main === module) {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`[ARENIUM 27 CORE] Server running on port ${PORT} (All network interfaces)`);
